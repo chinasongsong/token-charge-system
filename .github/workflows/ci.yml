@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  architecture-and-gc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Boundary Check
+        run: python scripts/check_boundaries.py
+
+      - name: GC Scan
+        run: python scripts/gc_scan.py
+
+  java-build-if-present:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build with Maven if pom.xml exists
+        run: |
+          if [ -f pom.xml ]; then
+            mvn -B -ntp test
+          else
+            echo "No pom.xml found, skip Maven job."
+          fi
