@@ -37,6 +37,10 @@
 2. 后续 PR 不允许新增违规。
 3. 每次修复违规都应同步减少基线文件。
 
+## 部署制品（与分层的关系）
+
+Java 分层约束仅作用于业务代码目录；**Dockerfile、Compose、初始化 SQL、环境示例文件** 等部署制品放在 `deploy/` 与各服务构建目录中，随本仓库版本发布，不在 `presentation/application/domain/infrastructure` 四层之内。
+
 ## 本仓库机械化校验
 
 - 本地：`python scripts/check_boundaries.py`

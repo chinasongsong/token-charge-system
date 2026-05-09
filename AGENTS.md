@@ -21,6 +21,7 @@
 - `payment-service/`：充值与支付回调
 - `ops-console/`：运营管理后台
 - `console-web/`：C 端用户前台
+- `deploy/`：Docker Compose、部署脚本与环境示例（密钥不入库）
 - `docs/`：架构与治理文档
 - `tests/architecture/`：分层边界测试
 - `scripts/`：工程守护脚本
