@@ -4,6 +4,23 @@ server:
 spring:
   application:
     name: adapter-service
+  datasource:
+    url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+tokenhub:
+  adapter:
+    provider-code: deepseek
+    # 与 DeepSeek 官方 OpenAI 兼容 API 的 model 字段一致（见 api-docs.deepseek.com）
+    default-chat-model: deepseek-v4-flash
+    deepseek-api-key: ${DEEPSEEK_API_KEY:}
+    deepseek-base-url-fallback: ${DEEPSEEK_BASE_URL_FALLBACK:https://api.deepseek.com}
 
 management:
   endpoints:

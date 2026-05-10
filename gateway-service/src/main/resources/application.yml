@@ -4,6 +4,25 @@ server:
 spring:
   application:
     name: gateway-service
+  codec:
+    max-in-memory-size: 16MB
+  cloud:
+    gateway:
+      routes:
+        - id: adapter-v1
+          uri: ${TOKENS_GATEWAY_ADAPTER_URI:http://127.0.0.1:8102}
+          predicates:
+            - Path=/v1/**
+        - id: user-center
+          uri: ${TOKENS_GATEWAY_USER_URI:http://127.0.0.1:8101}
+          predicates:
+            - Path=/user/**
+      # 本版本 Gateway 将 connect-timeout / response-timeout 绑定为 Integer（毫秒）。
+      # 切勿写纯小数点前的「120」当作秒——会被当成 120ms 导致 LLM 立即 504。
+      httpclient:
+        connect-timeout: 15000
+        # 默认 600000 ms = 10 分钟；可用环境变量覆盖（数值仍为毫秒）
+        response-timeout: ${TOKENS_GATEWAY_RESPONSE_TIMEOUT:600000}
 
 management:
   endpoints:

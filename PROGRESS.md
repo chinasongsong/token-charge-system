@@ -57,19 +57,27 @@
 
 ## P2 网关 + 首家供应商（DeepSeek）
 
-**完成状态**：未开始  
+**完成状态**：已完成  
 
 ### 本阶段做了什么
 
-（阶段完成后填写：网关路由、`DeepSeekAdapter`、`/v1/chat/completions` 非流式、过滤器与配置等。）
+- **`gateway-service`**：Spring Cloud Gateway 路由 `/v1/**` → 适配器、`/user/**` → 用户中心；HTTP 客户端超时；`TraceGatewayFilter`（`X-Trace-Id`）；`V1IngressAuthGatewayFilter`（`/v1/**` 非空 Bearer，可选与 `JWT_SECRET` 一致的 JWT 校验并注入 `X-User-Id`）；统一 JSON 错误体。
+- **`adapter-service`**：`ProviderAdapter` + **`DeepSeekProviderAdapter`**（库表 `model_providers` 优先 `base_url`，否则 `DEEPSEEK_BASE_URL_FALLBACK`）；服务端密钥 `DEEPSEEK_API_KEY`；默认聊天模型 **`deepseek-v4`**；上游错误映射为 `BusinessException`；**`OpenAiCompatibleController`** 暴露 **`POST /v1/chat/completions`**、**`GET /v1/models`**；MyBatis 注册表与 **`V3__seed_model_providers_deepseek.sql`** 种子数据。
+- **未纳入本阶段**：网关侧「开发者 API Key」解析与计费联动，顺延至 **P3**（与 `api_keys` 一致后再接）。
 
 ### 关键交付物（路径）
 
+`gateway-service/src/main/resources/application.yml`、`gateway-service/src/main/java/.../infrastructure/web/*.java`、`adapter-service`（`application` / `domain/provider` / `infrastructure/deepseek` / `presentation/OpenAiCompatibleController.java`）、`deploy/sql/V3__seed_model_providers_deepseek.sql`、`deploy/env.example`。
+
 ### 验收与检查
+
+- 启动 MySQL（含 `V1`–`V3` 初始化）、`user-center`（8101）、`adapter-service`（8102）、`gateway`（8080）；配置 **`DEEPSEEK_API_KEY`**。
+- `curl http://localhost:8080/v1/models -H "Authorization: Bearer test"` 返回模型列表；`POST /v1/chat/completions`（JSON 与 OpenAI 兼容）经网关转发至适配器并调用上游。
+- `mvn -pl gateway-service,adapter-service -am test`；`python scripts/check_boundaries.py` 通过。
 
 ### 遗留 / 下一阶段的输入
 
----
+- 开发者 API Key 入站、扣费与用量：`billing-service` **P3**。
 
 ## P3 计费 MVP
 

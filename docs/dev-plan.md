@@ -21,7 +21,7 @@
 | 项 | 默认值 |
 |---|---|
 | 首发用户场景 | 开发者 API + 普通用户 Web 对话 |
-| 首发模型与供应商 | **DeepSeek**（官方 **OpenAI 兼容** API）；**默认模型 ID `deepseek-v4`**（若公开文档中名称有变，以 `model_providers` / `model_prices` 配置为准，不修改适配层协议）。**第二家供应商**（P4）：计划 **阿里云百炼（DashScope）或智谱 AI**（实施前在运营配置中二选一并写死一家为默认备选）。 |
+| 首发模型与供应商 | **DeepSeek**（官方 **OpenAI 兼容** API）；**默认 API 模型 ID `deepseek-v4-flash`** 或 `deepseek-v4-pro`（以 [官方文档](https://api-docs.deepseek.com) 为准；产品口语「V4」时配置仍用上述 ID）。**第二家供应商**（P4）：计划 **阿里云百炼（DashScope）或智谱 AI**（实施前在运营配置中二选一并写死一家为默认备选）。 |
 | 首期支付通道 | Mock 支付（跑通账务闭环），后接微信/支付宝 |
 | 前端框架 | Vue 3 + Vite + TypeScript + Pinia + Vue Router + Element Plus |
 | 消息中间件 | RabbitMQ（P7 引入；P0–P6 走同步调用 + 数据库事件表过渡） |
@@ -95,13 +95,13 @@
 ### P2 网关 + 首家供应商（gateway-service + adapter-service）
 
 **任务**
-- [ ] P2-1 `gateway-service` 引入 Spring Cloud Gateway（WebFlux），路由 `/v1/**` → `adapter-service`，`/user/**` → `user-center-service`。
-- [ ] P2-2 全局过滤器：TraceID、JWT 解析（用户调用）、API Key 解析（开发者调用）。
-- [ ] P2-3 `adapter-service` 定义 `ProviderAdapter` 接口（`chat`, `embedding`, `listModels`）。
-- [ ] P2-4 实现 **`DeepSeekAdapter`**（对接 DeepSeek 官方 OpenAI 兼容入口；**首发默认模型 `deepseek-v4`**；先非流式）。
-- [ ] P2-5 错误码统一：把供应商错误码归一到平台错误码（在 `adapter-service` 内）。
-- [ ] P2-6 `model_providers` 表配置驱动，密钥从环境变量加载。
-- [ ] P2-7 接口：`POST /v1/chat/completions`（非流式）、`GET /v1/models`。
+- [x] P2-1 `gateway-service` 引入 Spring Cloud Gateway（WebFlux），路由 `/v1/**` → `adapter-service`，`/user/**` → `user-center-service`。
+- [x] P2-2 全局过滤器：TraceID（`X-Trace-Id`）、`/v1/**` 入站 Bearer 校验与可选 JWT 解析；**开发者 API Key 入站解析** 与 `api_keys` 表联动在 **P3** 完成。
+- [x] P2-3 `adapter-service` 定义 `ProviderAdapter` 接口（`chat`, `embedding`, `listModels`）。
+- [x] P2-4 实现 **`DeepSeekProviderAdapter`**（对接 DeepSeek 官方 OpenAI 兼容入口；**首发默认模型 `deepseek-v4`**；先非流式）。
+- [x] P2-5 错误码统一：把供应商错误码归一到平台错误码（在 `adapter-service` 内通过 `BusinessException` / `ErrorCode`）。
+- [x] P2-6 `model_providers` 表配置驱动，密钥从环境变量加载（`DEEPSEEK_API_KEY` / `tokenhub.adapter.deepseek-api-key`）。
+- [x] P2-7 接口：`POST /v1/chat/completions`（非流式）、`GET /v1/models`。
 
 **验收**
 - 用 OpenAI Python SDK，仅替换 base_url 即可调通。
@@ -224,5 +224,5 @@
 
 ## 6. 当前阶段
 
-- **已完成**：P0 工程地基；**P1** `user-center-service` 用户注册/登录/JWT、`users`/`user_devices`/`password_reset_codes`、密码找回与设备轨迹。
-- **下一步**：开始 **P2 网关 + 首家供应商**（`gateway-service` 路由与 `adapter-service` **DeepSeek（deepseek-v4）** 适配）。
+- **已完成**：P0 工程地基；**P1** `user-center-service` 用户注册/登录/JWT、`users`/`user_devices`/`password_reset_codes`、密码找回与设备轨迹；**P2** `gateway-service` 路由与入场过滤器、`adapter-service` **DeepSeek（deepseek-v4）** 适配与 `/v1/chat/completions`、`/v1/models`。
+- **下一步**：开始 **P3 计费 MVP**（`billing-service`、`api_keys`、余额与扣费等）。
