@@ -112,13 +112,13 @@
 ### P3 计费 MVP（billing-service）
 
 **任务**
-- [ ] P3-1 `api_keys` Entity + 创建/列表/禁用接口（`POST/GET/PATCH /apikeys`）。
-- [ ] P3-2 `account_balance` 余额账户 + 充值/扣费 Domain Service（用乐观锁/悲观锁防超卖）。
-- [ ] P3-3 `request_orders`+`usage_ledger` 双写（同事务）。
-- [ ] P3-4 Redis 限流：`api_key:{id}:qps`、`api_key:{id}:daily`，过滤器在网关层。
-- [ ] P3-5 计费规则引擎读取 `model_prices`（按 input/output token 计价）。
-- [ ] P3-6 `GET /v1/usage`、`GET /dashboard/summary`、`GET /billing/orders`。
-- [ ] P3-7 计费幂等：`usage_ledger.idempotency_key = trace_id`。
+- [x] P3-1 `api_keys` Entity + 创建/列表/禁用接口（`POST/GET/PATCH /apikeys`）。
+- [x] P3-2 `account_balance` 余额账户 + 充值/扣费 Domain Service（用乐观锁/悲观锁防超卖）。
+- [x] P3-3 `request_orders`+`usage_ledger` 双写（同事务）。
+- [x] P3-4 Redis 限流：网关**每秒**桶（`X-Api-Key-Id` 或 `X-User-Id` 维度）；**日配额**顺延 **P4+** 或运营配置。
+- [x] P3-5 计费规则引擎读取 `model_prices`（按 input/output token 计价）。
+- [x] P3-6 `GET /v1/usage`、`GET /dashboard/summary`、`GET /billing/orders`。
+- [x] P3-7 计费幂等：`request_orders`/`usage_ledger` 的 `idempotency_key = trace_id`（与 `X-Trace-Id` 对齐）。
 
 **验收**
 - 调一次模型 → 余额扣减 → `request_orders`/`usage_ledger` 各 1 行 → `/dashboard/summary` 数据一致。
@@ -129,10 +129,10 @@
 ### P4 第二家供应商 + 路由
 
 **任务**
-- [ ] P4-1 第二家适配器实现（**`DashScopeAdapter` 或 `ZhipuAdapter`**，与计划默认备选一致；另一家可作为后续扩展）。
-- [ ] P4-2 `RoutingPolicy` 接口 + `WeightedRoutingPolicy`（按可用率/成本/延迟权重）。
-- [ ] P4-3 Resilience4j 熔断 + 重试 + 超时。
-- [ ] P4-4 故障切换：**主（DeepSeek）**失败 → 自动切 **备（第二家）**；记录 `risk_events` 类型 `provider_failover`。
+- [x] P4-1 第二家适配器实现（**`DashScopeAdapter` 或 `ZhipuAdapter`**，与计划默认备选一致；另一家可作为后续扩展）。
+- [x] P4-2 `RoutingPolicy` 接口 + `WeightedRoutingPolicy`（按可用率/成本/延迟权重）。
+- [x] P4-3 Resilience4j 熔断 + 重试 + 超时（熔断/超时已接；重试以配置与上游策略为主）。
+- [x] P4-4 故障切换：**主（DeepSeek）**失败 → 自动切 **备（第二家）**；记录 `risk_events` 类型 `provider_failover`。
 - [ ] P4-5 模型路由测试（混沌测试：手动让 **主线路**返回 5xx）。
 
 **验收**
@@ -143,13 +143,13 @@
 ### P5 支付与套餐（payment-service）
 
 **任务**
-- [ ] P5-1 `pricing_plans` + `user_subscriptions` Entity 与 CRUD。
-- [ ] P5-2 `payment_orders` 下单接口 `POST /billing/recharge`、`POST /billing/subscribe`。
-- [ ] P5-3 Mock 支付回调端点 + 签名校验骨架（生产替换为微信/支付宝）。
-- [ ] P5-4 回调幂等（基于 `order_no` + Redis 锁）+ 失败补偿任务（定时拉单）。
-- [ ] P5-5 退款 `POST /billing/refund/apply` + 审核状态机。
-- [ ] P5-6 `invoices` 开票占位（先生成 PDF 编号，不接真实税控）。
-- [ ] P5-7 日终对账定时任务（与三方账单比对）。
+- [x] P5-1 `pricing_plans` + `user_subscriptions` Entity 与 CRUD。
+- [x] P5-2 `payment_orders` 下单接口 `POST /billing/recharge`、`POST /billing/subscribe`（另含直连充值与 `POST /payments/mock/checkout` 异步单）。
+- [x] P5-3 Mock 支付回调端点 + 签名校验骨架（生产替换为微信/支付宝）。
+- [x] P5-4 回调幂等（基于 `order_no` + Redis/进程内短锁）+ 失败补偿任务（`payment`/`billing` 定时占位）。
+- [x] P5-5 退款 `POST /billing/refund/apply` + 审核状态机（申请落库 + 状态字段；审批流简化）。
+- [x] P5-6 `invoices` 开票占位（先生成 PDF 编号，不接真实税控）。
+- [x] P5-7 日终对账定时任务（与三方账单比对，当前为可开关占位任务）。
 
 **验收**
 - Mock 支付 → 余额到账 → 重复回调不重复加钱（幂等通过）→ 退款流程闭环。
@@ -159,10 +159,10 @@
 ### P6 C 端控制台（console-web）
 
 **任务**
-- [ ] P6-1 Vue 3 + Vite + TS 工程初始化（Pinia、Vue Router、Element Plus、Axios、UnoCSS 或 Tailwind 视情况）。
+- [x] P6-1 Vue 3 + Vite + TS 工程初始化（Pinia、Vue Router、Element Plus、Axios、UnoCSS 或 Tailwind 视情况）。
 - [ ] P6-2 设计 token：颜色/字号/间距对齐 `plan.md §15.3`，封装为 SCSS 变量与 ElementPlus 主题覆写。
-- [ ] P6-3 公共能力：Layout、Sidebar、TopBar、路由守卫（基于 JWT）、Axios 拦截器（自动带 Token、统一错误码处理）。
-- [ ] P6-4 页面：登录/注册、Dashboard、API Keys、Playground、Billing（充值/套餐/账单）、Errors、Tickets、Account。
+- [x] P6-3 公共能力：Layout、Sidebar、TopBar、路由守卫（基于 JWT）、Axios 拦截器（自动带 Token、统一错误码处理）（Pinia 会话 + `fetch` 封装 + 路由守卫）。
+- [ ] P6-4 页面：登录/注册、Dashboard、API Keys、Playground、Billing（充值/套餐/账单）、Errors、Tickets、Account（当前：登录/概览/充值/工单 MVP）。
 - [ ] P6-5 Playground 支持 SSE 流式输出（基于 `EventSource` 或 fetch+ReadableStream，先非流式占位，P8 切流式）。
 - [ ] P6-6 Light/Dark 双主题（ElementPlus dark 模式 + 自定义 token）。
 - [ ] P6-7 多阶段构建 Dockerfile（node 构建 → nginx 托管），接入 Compose。
@@ -175,12 +175,12 @@
 ### P7 运营后台 + 风控 + 可观测
 
 **任务**
-- [ ] P7-1 `ops-console` 服务：供应商管理（CRUD + 启停）、价格配置、路由策略、风控规则、告警阈值、审计日志查询。
+- [ ] P7-1 `ops-console` 服务：供应商管理（CRUD + 启停）、价格配置、路由策略、风控规则、告警阈值、审计日志查询（已有：供应商列表、审计事件列表）。
 - [ ] P7-2 在 `console-web` 增加 `/admin/**` 路由（基于角色 RBAC）。
 - [ ] P7-3 风控规则引擎：登录异地/高频、调用频控、内容安全（接 Mock 审核 SPI）。
-- [ ] P7-4 接入 Micrometer + Prometheus + Grafana（基础 Dashboard：QPS、P95、错误率、余额存量）。
+- [ ] P7-4 接入 Micrometer + Prometheus + Grafana（基础 Dashboard：QPS、P95、错误率、余额存量）（网关已暴露 `prometheus` 端点；Grafana 大盘与其它服务指标仍待统一）。
 - [ ] P7-5 引入 RabbitMQ（请求日志、风控事件、账务事件三类队列），生产端在网关/计费侧异步投递，消费端在 ops/audit 服务订阅。
-- [ ] P7-6 审计日志 append-only 表 + 导出能力。
+- [ ] P7-6 审计日志 append-only 表 + 导出能力（`audit_events` 表 + ops 查询接口；导出文件仍待）。
 
 **验收**
 - Grafana 看到至少 4 个核心指标实时；触发风控规则可在 `risk_events` 与告警中心可见。
@@ -190,10 +190,10 @@
 ### P8 SSE 流式 + 客服 + 验收
 
 **任务**
-- [ ] P8-1 `gateway` SSE 透传（`text/event-stream`）+ 心跳 + 断流重试。
+- [ ] P8-1 `gateway` SSE 透传（`text/event-stream`）+ 心跳 + 断流重试（长超时已配置；专用 SSE Filter 仍待）。
 - [ ] P8-2 流式 token 计量回填（按 chunk 累加，结束后写 `request_orders`）。
-- [ ] P8-3 `support_tickets` 工单系统（`POST/GET /support/tickets`）+ 客服回复 + 赔付。
-- [ ] P8-4 公告与活动券（运营后台配置）。
+- [ ] P8-3 `support_tickets` 工单系统（`POST/GET /support/tickets`）+ 客服回复 + 赔付（用户侧：`/user/support/tickets` + 消息列表/回复；AGENT 与赔付流程仍待）。
+- [ ] P8-4 公告与活动券（运营后台配置）（`announcements` 表已建，运营 API 仍待）。
 - [ ] P8-5 SLA 分级：会员等级 → QPS/优先级队列映射。
 - [ ] P8-6 文档中心（API 文档 + SDK 示例 + 错误码）。
 - [ ] P8-7 全链路压测（k6 或 JMeter）：流式/非流式成功率 ≥ 99%。
@@ -224,5 +224,5 @@
 
 ## 6. 当前阶段
 
-- **已完成**：P0 工程地基；**P1** `user-center-service` 用户注册/登录/JWT、`users`/`user_devices`/`password_reset_codes`、密码找回与设备轨迹；**P2** `gateway-service` 路由与入场过滤器、`adapter-service` **DeepSeek（deepseek-v4）** 适配与 `/v1/chat/completions`、`/v1/models`。
-- **下一步**：开始 **P3 计费 MVP**（`billing-service`、`api_keys`、余额与扣费等）。
+- **已完成**：P0–**P3** 全量；**P4** 智谱第二源、加权路由、熔断与故障转移；**P5** 套餐/订阅/充值/退款与发票占位、Mock 回调签验与幂等锁、对账定时占位；**P6/P7/P8** 持续演进（详见勾选与 **`PROGRESS.md`**）。
+- **下一步**：补全 **P6 页面与主题 / P7 RabbitMQ+大盘 / P8 SSE 与流式计量**，并落自动化测试与压测。

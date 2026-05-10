@@ -36,7 +36,7 @@
 | `gateway-service` | `gateway-service` | Spring Cloud Gateway 接入层（与 WebMVC 隔离，不依赖 `common-web`） |
 | `user-center-service` | `user-center-service` | 用户与认证：注册/登录/JWT、`users` / `user_devices` / 密码重置码表、设备登录轨迹（P1 已实现 HTTP 面） |
 | `adapter-service` | `adapter-service` | 供应商适配（**P2 起首家 DeepSeek / deepseek-v4**；P4 第二家 DashScope 或智谱双活） |
-| `billing-service` | `billing-service` | 计费与账务（P3 起） |
+| `billing-service` | `billing-service` | **P3**：API Key、余额、`model_prices` 计价、`request_orders`/`usage_ledger`；内部 `/internal/**` 供网关/适配器 |
 | `payment-service` | `payment-service` | 支付与对账（P5 起） |
 | `ops-console` | `ops-console` | 运营控制面（P7 起） |
 | `console-web/` | （npm `console-web`） | C 端控制台（Vue 3 + Vite + TS，P6 丰富页面） |
