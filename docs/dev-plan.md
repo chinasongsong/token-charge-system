@@ -20,7 +20,7 @@
 | 项 | 默认值 |
 |---|---|
 | 首发用户场景 | 开发者 API + 普通用户 Web 对话 |
-| 首批供应商 | 阿里云百炼（DashScope OpenAI 兼容）、智谱 AI（GLM OpenAI 兼容） |
+| 首发模型与供应商 | **DeepSeek**（官方 **OpenAI 兼容** API）；**默认模型 ID `deepseek-v4`**（若公开文档中名称有变，以 `model_providers` / `model_prices` 配置为准，不修改适配层协议）。**第二家供应商**（P4）：计划 **阿里云百炼（DashScope）或智谱 AI**（实施前在运营配置中二选一并写死一家为默认备选）。 |
 | 首期支付通道 | Mock 支付（跑通账务闭环），后接微信/支付宝 |
 | 前端框架 | Vue 3 + Vite + TypeScript + Pinia + Vue Router + Element Plus |
 | 消息中间件 | RabbitMQ（P7 引入；P0–P6 走同步调用 + 数据库事件表过渡） |
@@ -32,9 +32,9 @@
 |---|---|---|---|---|
 | **P0** | 工程地基 | W1 | Maven 多模块、Compose 全量基础设施、初始化 SQL、OpenAPI 骨架、统一返回与错误码 | §2、§4、§7 W1-W2 |
 | **P1** | 用户与认证 | W2 | `user-center-service`：注册/登录/JWT/密码重置、`users`/`user_devices` 表 | §11.4、§14.1 |
-| **P2** | 网关 + 首家供应商 | W2-W3 | `gateway-service`、`adapter-service`（DashScope）、`/v1/chat/completions` 非流式 | §4、§7 W1-W2 |
+| **P2** | 网关 + 首家供应商 | W2-W3 | `gateway-service`、`adapter-service`（**DeepSeek** OpenAI 兼容；默认模型 **deepseek-v4**）、`/v1/chat/completions` 非流式 | §4、§7 W1-W2 |
 | **P3** | 计费 MVP | W3-W4 | `billing-service`：API Key、余额、`request_orders`+`usage_ledger`、Redis 限流 | §11.4、§14.2/14.5/14.6 |
-| **P4** | 第二家供应商 + 路由 | W4 | 智谱适配、路由策略、熔断/重试/降级 | §7 W3-W4 |
+| **P4** | 第二家供应商 + 路由 | W4 | **DashScope 或智谱**（与 DeepSeek 双活）、路由策略、熔断/重试/降级 | §7 W3-W4 |
 | **P5** | 支付与套餐 | W5-W6 | `payment-service`：Mock 支付 + 充值下单 + 回调幂等；`pricing_plans` + `user_subscriptions`；退款/发票 | §14.3/14.7 |
 | **P6** | C 端控制台 | W5-W7 | `console-web`（Vue3）：登录、Dashboard、Key 管理、充值套餐、账单、Playground | §11.3、§12 |
 | **P7** | 运营后台 + 风控 + 可观测 | W7-W9 | `ops-console`：供应商/价格/风控/告警；Prometheus + Grafana；引入 RabbitMQ（请求日志/风控/账务三类队列） | §4、§8.1 |
@@ -97,7 +97,7 @@
 - [ ] P2-1 `gateway-service` 引入 Spring Cloud Gateway（WebFlux），路由 `/v1/**` → `adapter-service`，`/user/**` → `user-center-service`。
 - [ ] P2-2 全局过滤器：TraceID、JWT 解析（用户调用）、API Key 解析（开发者调用）。
 - [ ] P2-3 `adapter-service` 定义 `ProviderAdapter` 接口（`chat`, `embedding`, `listModels`）。
-- [ ] P2-4 实现 `DashScopeAdapter`（OpenAI 兼容协议，先非流式）。
+- [ ] P2-4 实现 **`DeepSeekAdapter`**（对接 DeepSeek 官方 OpenAI 兼容入口；**首发默认模型 `deepseek-v4`**；先非流式）。
 - [ ] P2-5 错误码统一：把供应商错误码归一到平台错误码（在 `adapter-service` 内）。
 - [ ] P2-6 `model_providers` 表配置驱动，密钥从环境变量加载。
 - [ ] P2-7 接口：`POST /v1/chat/completions`（非流式）、`GET /v1/models`。
@@ -128,14 +128,14 @@
 ### P4 第二家供应商 + 路由
 
 **任务**
-- [ ] P4-1 `ZhipuAdapter` 实现。
+- [ ] P4-1 第二家适配器实现（**`DashScopeAdapter` 或 `ZhipuAdapter`**，与计划默认备选一致；另一家可作为后续扩展）。
 - [ ] P4-2 `RoutingPolicy` 接口 + `WeightedRoutingPolicy`（按可用率/成本/延迟权重）。
 - [ ] P4-3 Resilience4j 熔断 + 重试 + 超时。
-- [ ] P4-4 故障切换：A 失败 → 自动切 B；记录 `risk_events` 类型 `provider_failover`。
-- [ ] P4-5 模型路由测试（混沌测试：手动让 A 返回 5xx）。
+- [ ] P4-4 故障切换：**主（DeepSeek）**失败 → 自动切 **备（第二家）**；记录 `risk_events` 类型 `provider_failover`。
+- [ ] P4-5 模型路由测试（混沌测试：手动让 **主线路**返回 5xx）。
 
 **验收**
-- 关掉 A 的密钥，调用仍成功，账单 provider 字段为 B。
+- 关掉 **主线路（DeepSeek）**密钥或模拟故障后，调用仍成功，账单 `provider` 字段为 **备线路**对应编码。
 
 ---
 
@@ -223,4 +223,4 @@
 ## 6. 当前阶段
 
 - **已完成**：P0 工程地基；**P1** `user-center-service` 用户注册/登录/JWT、`users`/`user_devices`/`password_reset_codes`、密码找回与设备轨迹。
-- **下一步**：开始 **P2 网关 + 首家供应商**（`gateway-service` 路由与 `adapter-service` DashScope 适配）。
+- **下一步**：开始 **P2 网关 + 首家供应商**（`gateway-service` 路由与 `adapter-service` **DeepSeek（deepseek-v4）** 适配）。

@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
 
 CREATE TABLE IF NOT EXISTS model_providers (
   id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-  code VARCHAR(64) NOT NULL UNIQUE COMMENT 'dashscope|zhipu',
+  code VARCHAR(64) NOT NULL UNIQUE COMMENT 'deepseek|dashscope|zhipu',
   title VARCHAR(191) NOT NULL,
   base_url VARCHAR(512) DEFAULT NULL,
   capability_json TEXT COMMENT 'capabilities',

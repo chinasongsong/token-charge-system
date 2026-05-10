@@ -35,7 +35,7 @@
 | `common/common-mybatis` | `common-mybatis` | MyBatis-Plus 与驱动版本对齐（后续各服务按需依赖） |
 | `gateway-service` | `gateway-service` | Spring Cloud Gateway 接入层（与 WebMVC 隔离，不依赖 `common-web`） |
 | `user-center-service` | `user-center-service` | 用户与认证：注册/登录/JWT、`users` / `user_devices` / 密码重置码表、设备登录轨迹（P1 已实现 HTTP 面） |
-| `adapter-service` | `adapter-service` | 供应商适配（P2 起） |
+| `adapter-service` | `adapter-service` | 供应商适配（**P2 起首家 DeepSeek / deepseek-v4**；P4 第二家 DashScope 或智谱双活） |
 | `billing-service` | `billing-service` | 计费与账务（P3 起） |
 | `payment-service` | `payment-service` | 支付与对账（P5 起） |
 | `ops-console` | `ops-console` | 运营控制面（P7 起） |

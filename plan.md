@@ -3,7 +3,7 @@ name: Java模型API中转平台
 overview: 构建一个面向 C 端用户的 Java/Spring Boot 模型 API 中转平台（对标 TaoToken 产品形态），同时服务开发者 API 调用与普通用户网页使用场景，支持混合收费（余额+套餐）、多供应商聚合、风控与运营增长闭环。
 todos:
   - id: define-c-end-scope
-    content: 确认C端首发范围（开发者API+普通用户网页聊天）与2家首批供应商
+    content: 确认C端首发范围（开发者API+普通用户网页聊天）；首家接入 DeepSeek（默认模型 deepseek-v4），第二家备选 DashScope 或智谱
     status: pending
   - id: bootstrap-project
     content: 初始化Spring Boot多模块工程（网关、用户中心、计费、运营后台）与统一API规范
@@ -53,12 +53,12 @@ flowchart LR
   apiGateway --> userSvc[UserAndIdentityService]
   apiGateway --> authSvc[AuthAndKeyService]
   apiGateway --> routeSvc[ModelRoutingService]
-  routeSvc --> adapterAli[AdapterAliyun]
-  routeSvc --> adapterBaidu[AdapterBaidu]
+  routeSvc --> adapterDeepSeek[AdapterDeepSeek]
+  routeSvc --> adapterDashScope[AdapterDashScope]
   routeSvc --> adapterZhipu[AdapterZhipu]
-  adapterAli --> providerAli[ProviderAPI]
-  adapterBaidu --> providerBaidu[ProviderAPI]
-  adapterZhipu --> providerZhipu[ProviderAPI]
+  adapterDeepSeek --> providerDeepSeek[DeepSeekAPI]
+  adapterDashScope --> providerDashScope[DashScopeAPI]
+  adapterZhipu --> providerZhipu[ZhipuAPI]
   apiGateway --> quotaSvc[QuotaAndBillingService]
   apiGateway --> pricingSvc[PricingAndPackageService]
   webPortal --> paySvc[PaymentService]
@@ -147,10 +147,10 @@ flowchart LR
 
 - **第 1~2 周（技术底座）**
   - 多模块工程搭建、统一错误码、统一 OpenAPI。
-  - 接入 1 家供应商，打通 `chat/completions` 非流式。
+  - **首家接入 DeepSeek**（官方 OpenAI 兼容 API），**默认模型 `deepseek-v4`**，打通 `chat/completions` 非流式。
 - **第 3~4 周（开发者闭环）**
   - API Key、限流、请求日志、余额扣费。
-  - 接入第 2 家供应商，路由与故障切换上线。
+  - 接入 **第 2 家供应商**（计划备选：**DashScope 或智谱**），与 DeepSeek **双活路由**与故障切换上线。
 - **第 5~6 周（C端闭环）**
   - 用户注册登录、充值、套餐购买、账单明细。
   - C端控制台（Key管理、调用统计、在线调试台）。
