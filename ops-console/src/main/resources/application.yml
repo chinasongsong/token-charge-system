@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: ops-console
+  datasource:
+    url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+tokenhub:
+  ops:
+    internal-token: ${OPS_INTERNAL_TOKEN:dev-ops-token}
 
 management:
   endpoints:
