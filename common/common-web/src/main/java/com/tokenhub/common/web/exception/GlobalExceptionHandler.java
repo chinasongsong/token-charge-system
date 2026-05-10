@@ -19,7 +19,15 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(BusinessException.class)
   public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
     log.warn("Business error: {} {}", ex.getErrorCode().getCode(), ex.getDetailMessage());
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+    HttpStatus status = switch (ex.getErrorCode()) {
+      case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+      case FORBIDDEN -> HttpStatus.FORBIDDEN;
+      case NOT_FOUND -> HttpStatus.NOT_FOUND;
+      case CONFLICT -> HttpStatus.CONFLICT;
+      case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
+      default -> HttpStatus.BAD_REQUEST;
+    };
+    return ResponseEntity.status(status)
         .body(ApiResponse.fail(ex.getErrorCode().getCode(), ex.getDetailMessage()));
   }
 

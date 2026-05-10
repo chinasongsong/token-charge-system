@@ -4,6 +4,21 @@ server:
 spring:
   application:
     name: user-center-service
+  datasource:
+    url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+tokenhub:
+  jwt:
+    issuer: user-center
+    secret: ${JWT_SECRET:dev-only-change-me-32bytes-minimum!!}
+    ttl-seconds: 86400
 
 management:
   endpoints:

@@ -10,6 +10,8 @@ servers:
     description: Production placeholder
   - url: http://localhost:8080
     description: Local gateway placeholder
+  - url: http://localhost:8101
+    description: user-center-service direct (dev)
 
 tags:
   - name: Auth
@@ -42,6 +44,12 @@ paths:
     post:
       tags: [Auth]
       summary: Password login (P1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
       responses:
         '200':
           description: Session token issued
@@ -49,6 +57,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseAuthToken'
+  /user/logout:
+    post:
+      tags: [Auth]
+      summary: Stateless logout hint (P1 — client discards JWT)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /user/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Request password reset code (P1 — code in server log until mail SPI wired)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Always OK when email format valid (no user enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /user/password/reset:
+    post:
+      tags: [Auth]
+      summary: Reset password with emailed/logged code (P1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
   /user/me:
     get:
       tags: [Users]
@@ -61,6 +114,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserProfile'
+        '401':
+          description: Missing or invalid JWT
   /v1/chat/completions:
     post:
       tags: [Models]
@@ -149,8 +204,59 @@ components:
       properties:
         accessToken:
           type: string
+        tokenType:
+          type: string
+          example: Bearer
         expiresInSeconds:
           type: integer
+          format: int64
+
+    ApiResponseEmpty:
+      type: object
+      properties:
+        traceId:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        data:
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    UserLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [email, code, newPassword]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+        newPassword:
+          type: string
+          format: password
 
     UserRegisterRequest:
       type: object
@@ -162,6 +268,8 @@ components:
         password:
           type: string
           format: password
+        displayName:
+          type: string
 
     ChatCompletionRequest:
       type: object

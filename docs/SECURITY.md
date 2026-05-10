@@ -7,6 +7,7 @@
 ## 基础控制
 
 - **P0**：`common-security` 提供 JWT 与 API Key 轻量工具；签名密钥与供应商密钥仅从环境读取（运行时注入 UTF-8 字符串或使用 KMS 下发的素材），不得在仓库或容器中写死明文。
+- **P1**：`user-center-service` 使用 `JWT_SECRET`（UTF-8，长度满足 HS256 要求）签发访问令牌；密码重置验证码当前经 `VerificationMailPort` 落日志，生产需替换为真实邮件/短信通道并缩短有效期与重放窗口。
 - API Key 仅存储摘要（`key_hash`/指纹字段），不明文持久化。
 - 敏感配置（供应商密钥、支付密钥）必须通过环境变量或密钥管理服务注入；仓库内仅保留 `deploy/env.example` 等模板，禁止提交含真实密钥的 `.env` 或密钥文件。
 - 所有对外接口必须有 TraceID，便于审计追踪。

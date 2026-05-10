@@ -27,7 +27,7 @@
 | 模块 | 典型分层职责 | 共享库 |
 |------|----------------|--------|
 | `gateway-service` | `presentation`↔路由/过滤器；`application` 编排轻量策略；领域规则保持稀疏 | 仅 JDK/Spring Cloud（避免 servlet stack） |
-| `user-center-service` | 清晰拆分注册登录用例：`domain` 无框架依赖，`infrastructure` 承载 MyBatis/JWT 装配 | `common-web`、`common-security`（JWT 密钥仍由环境与配置注入） |
+| `user-center-service` | 注册/登录/JWT、`password/forgot|reset`：`UserApplicationService` 编排事务；`domain` 仅纯模型与仓储接口；`infrastructure.persistence` 承载 MyBatis-Plus；JWT 解析在 `infrastructure.web` 拦截器 | `common-web`、`common-security`、`common-mybatis` |
 | `adapter-service` | Provider 适配在 `domain`/`application`，HTTP 出站位于 `infrastructure` | `common-web` |
 | `billing-service` | 账务不变量放于 `domain`；幂等与流水在 `application` | `common-web`，后续可加 `common-mybatis` |
 | `payment-service` | 下单/回调/对账：`application` 管事务，`infrastructure` 接 PSP SDK | `common-web` |

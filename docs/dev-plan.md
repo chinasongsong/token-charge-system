@@ -75,13 +75,15 @@
 ### P1 用户与认证（user-center-service）
 
 **任务**
-- [ ] P1-1 `users`/`user_devices` MyBatis-Plus Entity + Mapper。
-- [ ] P1-2 注册/登录/登出 + 密码 BCrypt + JWT 颁发（`common-security` 提供原子能力）。
-- [ ] P1-3 邮箱验证码（先打印到日志，留邮件 SPI 接口）。
-- [ ] P1-4 找回/重置密码。
-- [ ] P1-5 设备指纹与登录轨迹落库。
-- [ ] P1-6 接口：`POST /user/register`、`POST /user/login`、`POST /user/password/forgot`、`POST /user/password/reset`、`GET /user/me`。
-- [ ] P1-7 单元测试覆盖 application 层用例 ≥ 80%。
+- [x] P1-1 `users`/`user_devices` MyBatis-Plus Entity + Mapper。
+- [x] P1-2 注册/登录/登出 + 密码 BCrypt + JWT 颁发（`common-security` 提供原子能力）。
+- [x] P1-3 邮箱验证码（先打印到日志，留邮件 SPI 接口）。
+- [x] P1-4 找回/重置密码。
+- [x] P1-5 设备指纹与登录轨迹落库。
+- [x] P1-6 接口：`POST /user/register`、`POST /user/login`、`POST /user/password/forgot`、`POST /user/password/reset`、`GET /user/me`（另含 `POST /user/logout` 无状态提示）。
+- [x] P1-7 单元测试覆盖 application 层用例 ≥ 80%（`UserApplicationService` 行覆盖率由 Jacoco `check` 门禁）。
+
+**P1 交付物路径**：`user-center-service/src/main/java`（`domain` / `application` / `infrastructure.persistence` / `presentation`）、`deploy/sql/V2__password_reset_codes.sql`、`docs/openapi/unified-api.yaml`（用户路径补全）。
 
 **验收**
 - 用 curl 走完注册→登录→拿 JWT→访问 `/user/me`。
@@ -220,5 +222,5 @@
 
 ## 6. 当前阶段
 
-- **已完成**：P0 工程地基（验收以 CI JDK 21 + `mvn` / Compose 冒烟为准）。
-- **下一步**：开始 **P1 用户与认证**（`user-center-service` 注册登录与 JWT）。
+- **已完成**：P0 工程地基；**P1** `user-center-service` 用户注册/登录/JWT、`users`/`user_devices`/`password_reset_codes`、密码找回与设备轨迹。
+- **下一步**：开始 **P2 网关 + 首家供应商**（`gateway-service` 路由与 `adapter-service` DashScope 适配）。
