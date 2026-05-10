@@ -46,6 +46,7 @@
 3. 提交前执行：
    - `python scripts/check_boundaries.py`
    - `python scripts/gc_scan.py`
+4. **按功能粒度推送**：每收尾一个独立功能，`commit` → `push`；**提交说明与 PR 标题/正文使用简体中文**。需要 Code Review 时用 GitHub CLI（`gh pr create`）或已配置的 GitLens/GitHub MCP 建 PR。细则见仓库根 `.cursor/rules/git-commit-pr-workflow.mdc`（仅本仓库生效）。
 
 ## 质量门禁
 
