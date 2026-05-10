@@ -55,3 +55,9 @@
   - `ARCHITECTURE.md`
   - `docs/architecture/LAYERS.md`
 - 新增安全相关能力需同步更新 `docs/SECURITY.md`。
+
+
+## Agent 总结要求
+
+- 每次阶段性开发完成后，需对本次修改做一个总结，并同步更新：
+    - `PROGRESS.md`
