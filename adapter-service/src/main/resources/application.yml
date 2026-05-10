@@ -1,0 +1,12 @@
+server:
+  port: 8102
+
+spring:
+  application:
+    name: adapter-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

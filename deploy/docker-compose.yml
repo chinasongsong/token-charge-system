@@ -1,5 +1,5 @@
-# 与本仓库同行的 Compose 骨架：基础设施先行，应用服务在多模块落地后追加。
-# 使用方式（仓库根目录）：docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+# 与本仓库同行的 Compose：基础设施为先；占位服务在 Java 镜像就绪后取消注释。
+# 使用（仓库根目录）：docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d mysql redis
 
 services:
   mysql:
@@ -14,6 +14,7 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d:ro
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
 
   redis:
@@ -26,11 +27,45 @@ services:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]
 
-  # 示例占位：网关与各业务服务在多模块工程就绪后取消注释并指向本仓 Dockerfile
+  # ----- 以下在中间件引入阶段按需取消注释 -----
+  #
+  # rabbitmq:
+  #   image: rabbitmq:3-management-alpine
+  #   container_name: token-charge-rabbitmq
+  #   restart: unless-stopped
+  #   environment:
+  #     RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?set in .env}
+  #     RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?set in .env}
+  #     TZ: ${TZ:-Asia/Shanghai}
+  #   ports:
+  #     - "${RABBITMQ_PORT_AMQP:-5672}:5672"
+  #     - "${RABBITMQ_PORT_UI:-15672}:15672"
+
+  # prometheus:
+  #   image: prom/prometheus:v3.4.2
+  #   container_name: token-charge-prometheus
+  #   restart: unless-stopped
+  #   command: ["--config.file=/etc/prometheus/prometheus.yml"]
+  #   volumes:
+  #     - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   ports:
+  #     - "${PROMETHEUS_PORT:-9090}:9090"
+
+  # grafana:
+  #   image: grafana/grafana:11.6.5
+  #   container_name: token-charge-grafana
+  #   restart: unless-stopped
+  #   environment:
+  #     TZ: ${TZ:-Asia/Shanghai}
+  #   ports:
+  #     - "${GRAFANA_PORT:-3000}:3000"
+  #
+  # ----- Java 应用在镜像就绪后按需取消注释；构建上下文为仓库根目录 -----
+  #
   # gateway-service:
   #   build:
-  #     context: ../gateway-service
-  #     dockerfile: Dockerfile
+  #     context: ..
+  #     dockerfile: gateway-service/Dockerfile
   #   depends_on:
   #     - mysql
   #     - redis

@@ -1,0 +1,12 @@
+server:
+  port: 8103
+
+spring:
+  application:
+    name: billing-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

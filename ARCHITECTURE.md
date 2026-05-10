@@ -25,6 +25,24 @@
 4. 响应回传后触发计费、流水、审计事件。
 5. 控制台消费聚合数据进行展示。
 
+## 后端与前端模块布局（Maven / P0）
+
+| 模块路径 | Maven `artifactId` | 主要职责 |
+|-----------|---------------------|----------|
+| `common/common-core` | `common-core` | `ApiResponse`、`ErrorCode`、`BusinessException`、`TraceContext`、`TraceIdInterceptor`（供 MVC 链路选用） |
+| `common/common-web` | `common-web` | `TraceBootstrapFilter`、全局异常处理、请求日志过滤器 |
+| `common/common-security` | `common-security` | `JwtSupport`、`ApiKeySupport`（无业务耦合） |
+| `common/common-mybatis` | `common-mybatis` | MyBatis-Plus 与驱动版本对齐（后续各服务按需依赖） |
+| `gateway-service` | `gateway-service` | Spring Cloud Gateway 接入层（与 WebMVC 隔离，不依赖 `common-web`） |
+| `user-center-service` | `user-center-service` | 用户与认证（P1 起实现） |
+| `adapter-service` | `adapter-service` | 供应商适配（P2 起） |
+| `billing-service` | `billing-service` | 计费与账务（P3 起） |
+| `payment-service` | `payment-service` | 支付与对账（P5 起） |
+| `ops-console` | `ops-console` | 运营控制面（P7 起） |
+| `console-web/` | （npm `console-web`） | C 端控制台（Vue 3 + Vite + TS，P6 丰富页面） |
+
+根 `pom.xml` 统一 **JDK 21**、Spring Boot `3.3.6`、Spring Cloud `2023.0.5` BOM；`maven-enforcer-plugin` 要求构建 JDK ≥ 21。
+
 ## 部署与制品（Docker）
 
 - **默认交付形态**：各服务以容器镜像发布，通过 Docker Compose（或上层编排）一键拉起依赖与应用；镜像构建定义与各服务源码同仓维护。

@@ -1,0 +1,12 @@
+server:
+  port: 8105
+
+spring:
+  application:
+    name: ops-console
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

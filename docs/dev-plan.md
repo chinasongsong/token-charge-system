@@ -47,21 +47,23 @@
 ### P0 工程地基（必须最先完成）
 
 **任务**
-- [ ] P0-1 创建根 `pom.xml`（packaging=pom，统一 Spring Boot/Cloud BOM、Java 21、编码、插件）。
-- [ ] P0-2 建立模块结构：
+- [x] P0-1 创建根 `pom.xml`（packaging=pom，统一 Spring Boot/Cloud BOM、Java 21、编码、插件）。
+- [x] P0-2 建立模块结构：
   - `common/` (`common-core`、`common-web`、`common-security`、`common-mybatis`)
   - `gateway-service/`、`user-center-service/`、`adapter-service/`、`billing-service/`、`payment-service/`、`ops-console/`
   - `console-web/`（Vue 3 + Vite + TS，独立 `package.json`）
-- [ ] P0-3 每个 Java 服务初始化四层包结构 `com.tokenhub.<svc>.{presentation,application,domain,infrastructure}` + `Application.java` 启动类。
-- [ ] P0-4 在 `common-core` 定义统一返回 `ApiResponse<T>`、统一错误码 `ErrorCode`、`BusinessException`、`TraceId` 拦截器。
-- [ ] P0-5 在 `common-web` 定义 `GlobalExceptionHandler`、`RequestLoggingFilter`。
-- [ ] P0-6 在 `common-security` 定义 JWT/ApiKey 工具类（仅工具，不耦合业务）。
-- [ ] P0-7 各服务 `Dockerfile`（多阶段构建：`maven:3.9-eclipse-temurin-21` → `eclipse-temurin:21-jre-alpine`）。
-- [ ] P0-8 扩展 `deploy/docker-compose.yml`：加入 `rabbitmq`、`prometheus`、`grafana` 占位段（先注释，按阶段启用）；应用服务镜像引用先注释。
-- [ ] P0-9 初始化 SQL：`deploy/sql/V1__core_schema.sql`（users / user_devices / api_keys / account_balance / request_orders / usage_ledger / payment_orders / pricing_plans / user_subscriptions / model_providers / model_prices / risk_events / support_tickets）。
-- [ ] P0-10 OpenAPI 契约骨架：`docs/openapi/unified-api.yaml`（先列接口路径与请求/响应 Schema 头部）。
-- [ ] P0-11 更新 `ARCHITECTURE.md` 模块清单与依赖关系图；更新 `LAYERS.md` 模块边界表。
-- [ ] P0-12 跑 `scripts/check_boundaries.py` 与 `gc_scan.py` 全绿。
+- [x] P0-3 每个 Java 服务初始化四层包结构 `com.tokenhub.<svc>.{presentation,application,domain,infrastructure}` + `Application.java` 启动类。
+- [x] P0-4 在 `common-core` 定义统一返回 `ApiResponse<T>`、统一错误码 `ErrorCode`、`BusinessException`、`TraceId` 拦截器。
+- [x] P0-5 在 `common-web` 定义 `GlobalExceptionHandler`、`RequestLoggingFilter`。
+- [x] P0-6 在 `common-security` 定义 JWT/ApiKey 工具类（仅工具，不耦合业务）。
+- [x] P0-7 各服务 `Dockerfile`（多阶段构建：`maven:3.9-eclipse-temurin-21` → `eclipse-temurin:21-jre-alpine`）。
+- [x] P0-8 扩展 `deploy/docker-compose.yml`：加入 `rabbitmq`、`prometheus`、`grafana` 占位段（先注释，按阶段启用）；应用服务镜像引用先注释。
+- [x] P0-9 初始化 SQL：`deploy/sql/V1__core_schema.sql`（users / user_devices / api_keys / account_balance / request_orders / usage_ledger / payment_orders / pricing_plans / user_subscriptions / model_providers / model_prices / risk_events / support_tickets）。
+- [x] P0-10 OpenAPI 契约骨架：`docs/openapi/unified-api.yaml`（先列接口路径与请求/响应 Schema 头部）。
+- [x] P0-11 更新 `ARCHITECTURE.md` 模块清单与依赖关系图；更新 `LAYERS.md` 模块边界表。
+- [x] P0-12 跑 `scripts/check_boundaries.py` 与 `gc_scan.py` 全绿。
+
+**P0 交付物路径**：根 `pom.xml`；各 Java 模块与 `console-web/`；共享库：`common/*/src/main/java`；SQL：`deploy/sql/V1__core_schema.sql`；契约：`docs/openapi/unified-api.yaml`；Compose：`deploy/docker-compose.yml`。
 
 **验收**
 - 根目录 `mvn -B -ntp -DskipTests package` 成功。
@@ -218,5 +220,5 @@
 
 ## 6. 当前阶段
 
-- **进行中**：尚未开始 P0。
-- **下一步**：开始 **P0-1 创建根 `pom.xml`** 与 P0-2 模块骨架。
+- **已完成**：P0 工程地基（验收以 CI JDK 21 + `mvn` / Compose 冒烟为准）。
+- **下一步**：开始 **P1 用户与认证**（`user-center-service` 注册登录与 JWT）。

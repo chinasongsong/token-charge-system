@@ -1,0 +1,189 @@
+openapi: 3.1.0
+info:
+  title: Token Hub Unified API
+  version: 0.1.0
+  description: >
+    Contract skeleton for developer API and console surfaces. Implementations land per phase;
+    paths are stable identifiers for parallel frontend work.
+servers:
+  - url: https://api.example.com
+    description: Production placeholder
+  - url: http://localhost:8080
+    description: Local gateway placeholder
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Models
+  - name: Billing
+  - name: Payments
+  - name: Support
+  - name: Ops
+
+paths:
+  /user/register:
+    post:
+      tags: [Auth, Users]
+      summary: Register a new user (P1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+      responses:
+        '200':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserProfile'
+  /user/login:
+    post:
+      tags: [Auth]
+      summary: Password login (P1)
+      responses:
+        '200':
+          description: Session token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthToken'
+  /user/me:
+    get:
+      tags: [Users]
+      summary: Current profile (P1)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserProfile'
+  /v1/chat/completions:
+    post:
+      tags: [Models]
+      summary: OpenAI-compatible chat (P2 non-stream, P8 stream)
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Completion payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+  /v1/models:
+    get:
+      tags: [Models]
+      summary: List routable models (P2)
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      responses:
+        '200':
+          description: Model catalog
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Use `Bearer sk_...` for API-key style calls routed via gateway filters.
+
+  schemas:
+    ApiResponseUserProfile:
+      type: object
+      description: Wrapped success envelope (aligned with ApiResponse<UserProfile>)
+      properties:
+        traceId:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UserProfile'
+        timestamp:
+          type: string
+          format: date-time
+
+    ApiResponseAuthToken:
+      type: object
+      properties:
+        traceId:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AuthToken'
+        timestamp:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+
+    AuthToken:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        expiresInSeconds:
+          type: integer
+
+    UserRegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    ChatCompletionRequest:
+      type: object
+      description: Mirrors OpenAI chat completion request (trimmed placeholder).
+      properties:
+        model:
+          type: string
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+
+    ChatCompletionResponse:
+      type: object
+      description: OpenAI-compatible assistant message payload (trimmed placeholder).
+      properties:
+        id:
+          type: string
+        model:
+          type: string

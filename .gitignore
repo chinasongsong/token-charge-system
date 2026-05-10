@@ -1,3 +1,7 @@
 # Local overrides for Docker Compose — never commit real secrets
 deploy/.env
 .codemate
+
+**/target/
+**/dist/
+**/node_modules/

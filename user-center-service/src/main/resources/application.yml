@@ -1,0 +1,12 @@
+server:
+  port: 8101
+
+spring:
+  application:
+    name: user-center-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

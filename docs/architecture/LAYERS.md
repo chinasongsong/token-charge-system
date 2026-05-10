@@ -24,12 +24,15 @@
 
 ## 模块边界（目标）
 
-- `gateway-service`：只做接入编排，不承载复杂领域规则
-- `user-center-service`：用户认证与账户域
-- `adapter-service`：供应商协议适配与转换
-- `billing-service`：计费与账务域
-- `payment-service`：支付与对账域
-- `ops-console`：管理后台 BFF/接口
+| 模块 | 典型分层职责 | 共享库 |
+|------|----------------|--------|
+| `gateway-service` | `presentation`↔路由/过滤器；`application` 编排轻量策略；领域规则保持稀疏 | 仅 JDK/Spring Cloud（避免 servlet stack） |
+| `user-center-service` | 清晰拆分注册登录用例：`domain` 无框架依赖，`infrastructure` 承载 MyBatis/JWT 装配 | `common-web`、`common-security`（JWT 密钥仍由环境与配置注入） |
+| `adapter-service` | Provider 适配在 `domain`/`application`，HTTP 出站位于 `infrastructure` | `common-web` |
+| `billing-service` | 账务不变量放于 `domain`；幂等与流水在 `application` | `common-web`，后续可加 `common-mybatis` |
+| `payment-service` | 下单/回调/对账：`application` 管事务，`infrastructure` 接 PSP SDK | `common-web` |
+| `ops-console` | RBAC + 管理与审计查询入口 | `common-web` |
+| `console-web`（前端） | 视图与路由守卫；经由 OpenAPI 契约对接后端 | N/A |
 
 ## 违规处理（棘轮）
 

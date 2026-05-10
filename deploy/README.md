@@ -6,7 +6,8 @@
 
 - **随仓维护**：Compose、`Dockerfile` 引用路径、初始化 SQL（建议放在 `deploy/sql/` 或各服务模块下）、OpenAPI 与网关静态配置模板等均保留在仓库中，便于评审与回滚。
 - **密钥不入库**：复制 `env.example` 为本地 `.env`（勿提交），在生产环境用密钥管理或编排注入同名变量。
-- **演进**：Java 多模块与各业务镜像落地后，在本文件中补充构建命令与端口映射；当前 Compose 仅包含常用基础设施骨架（MySQL、Redis），应用服务待接入。
+- **演进**：`docker-compose.yml` 已挂载 `deploy/sql/` 到 MySQL 初始化目录（首次启动会执行 `V1__core_schema.sql`）；RabbitMQ / Prometheus / Grafana 与各业务服务镜像仍为**注释占位**，按阶段启用。
+- **Java 镜像构建**：在各服务目录下提供了多阶段 `Dockerfile`，构建上下文需为**仓库根目录**（参见各文件内注释）。根工程要求 **JDK 21**（`maven-enforcer-plugin`）。
 
 ## 快速开始（基础设施）
 
