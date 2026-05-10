@@ -1,7 +1,7 @@
 # 开发计划单（执行路线图）
 
 > 本文是 Agent 后续按阶段执行的**唯一权威路线图**。所有阶段必须在通过验收标准后才推进到下一阶段。
-> 上游依据：`plan.md`（产品/PRD）、`ARCHITECTURE.md`、`docs/architecture/LAYERS.md`、`docs/SECURITY.md`、`AGENTS.md`。
+> 上游依据：`plan.md`（产品/PRD）、`ARCHITECTURE.md`、`docs/architecture/LAYERS.md`、`docs/SECURITY.md`、`AGENTS.md`。阶段收口时需同步 **`PROGRESS.md`**。
 
 ## 0. 全局约定
 
@@ -14,6 +14,7 @@
   3. 跑该阶段单元/集成测试。
   4. 同步更新 `ARCHITECTURE.md`、`LAYERS.md`、`SECURITY.md`（若有结构性/安全性变化）。
   5. 在本文件相应阶段勾选 `Done` 并记录交付物路径。
+  6. **更新根目录 `PROGRESS.md` 中与本阶段对应的章节**（必填；口径见 `AGENTS.md`「阶段交付总结（强制）」）。
 
 ## 1. 默认假设（评审通过后写死）
 
@@ -208,6 +209,7 @@
 - 单元/集成测试（JUnit 5 + Mockito + Testcontainers）。
 - 安全基线复核（密钥不入库、敏感字段脱敏、TraceID）。
 - 文档同步：`ARCHITECTURE.md`、`LAYERS.md`、`SECURITY.md`、`docs/openapi/unified-api.yaml`、本计划单的 Done 勾选。
+- **阶段交付总结**：根目录 **`PROGRESS.md`** 对应章节（与计划勾选同步；细则见 `AGENTS.md`）。
 - 边界检查 + GC 扫描必须绿色。
 
 ## 5. 风险登记
