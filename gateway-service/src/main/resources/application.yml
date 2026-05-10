@@ -4,11 +4,41 @@ server:
 spring:
   application:
     name: gateway-service
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 3s
   codec:
     max-in-memory-size: 16MB
   cloud:
     gateway:
       routes:
+        # 更具体的路由须写在 /v1/** 之前
+        - id: billing-v1-usage
+          uri: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+          predicates:
+            - Path=/v1/usage
+        - id: billing-apikeys
+          uri: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+          predicates:
+            - Path=/apikeys,/apikeys/**
+        - id: billing-dashboard
+          uri: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+          predicates:
+            - Path=/dashboard/**
+        - id: billing-account-orders
+          uri: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+          predicates:
+            - Path=/billing/**
+        - id: payment-payments
+          uri: ${TOKENS_GATEWAY_PAYMENT_URI:http://127.0.0.1:8104}
+          predicates:
+            - Path=/payments/**
+        - id: ops-console
+          uri: ${TOKENS_GATEWAY_OPS_URI:http://127.0.0.1:8105}
+          predicates:
+            - Path=/ops/**
         - id: adapter-v1
           uri: ${TOKENS_GATEWAY_ADAPTER_URI:http://127.0.0.1:8102}
           predicates:
@@ -18,14 +48,21 @@ spring:
           predicates:
             - Path=/user/**
       # 本版本 Gateway 将 connect-timeout / response-timeout 绑定为 Integer（毫秒）。
-      # 切勿写纯小数点前的「120」当作秒——会被当成 120ms 导致 LLM 立即 504。
       httpclient:
         connect-timeout: 15000
-        # 默认 600000 ms = 10 分钟；可用环境变量覆盖（数值仍为毫秒）
         response-timeout: ${TOKENS_GATEWAY_RESPONSE_TIMEOUT:600000}
+
+tokenhub:
+  gateway:
+    billing-base-url: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+    internal-token: ${BILLING_INTERNAL_TOKEN:dev-internal-token}
+    rate-limit-per-second: ${GATEWAY_RATE_LIMIT_PER_SECOND:60}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: gateway-service
