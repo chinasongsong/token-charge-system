@@ -16,6 +16,6 @@ public class UserCenterWebConfiguration implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(@NonNull InterceptorRegistry registry) {
-    registry.addInterceptor(userJwtMvcInterceptor).addPathPatterns("/user/me");
+    registry.addInterceptor(userJwtMvcInterceptor).addPathPatterns("/user/me", "/user/support/**");
   }
 }

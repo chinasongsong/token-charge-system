@@ -1,0 +1,45 @@
+---
+description: 仅限本仓库：独立功能粒度提交推送、中文 commit/PR、PROGRESS/dev-plan 同步约束
+alwaysApply: true
+---
+
+# Git 提交与 PR（仅限本仓库）
+
+以下内容**仅对本仓库生效**：打开本 workspace（`token-charge-system` 根目录）时由 Cursor 加载；`PROGRESS.md` 与 `docs/dev-plan.md` 的阶段闭环要求也**仅限本仓库**存在，不要将「必须更新 PROGRESS」误认为其它通用工程守则。
+
+## 何时必须提交一次
+
+在完成**一个独立、可review 的功能点**后立即执行（不要为了「等大功能」积压）：
+- 可独立描述的改动；
+- `mvn`/前端 build 或通过该功能相关的自检；
+- 若涉及门禁：`python scripts/check_boundaries.py` 与 `python scripts/gc_scan.py`（在适用时）。
+
+禁止：在同一个 commit 里混放多个互不相关的功能。
+
+## 分支与命名
+
+- 从 `main`（或约定基线分支）拉出：`feat/<简述>`、`fix/<简述>`、`chore/<简述>`。
+- 一次功能尽量对应**一个分支**、**一至数个原子 commit**。
+
+## Commit 规范（强制中文）
+
+- **提交说明必须全部使用简体中文**：主题行与正文均为中文；不得使用英文作 commit message 主体。
+- 主题行可加前缀（建议仍用约定类型，便于检索）：如 `feat: `、`fix: `、`docs: `、`chore: `（类型词可保留英文，**冒号后以中文简述**）；或纯中文句式亦可。
+- 正文用中文简述「做了什么」与「为何要」；不要提交密钥、`.env` 明文。
+
+## 推送与 PR
+
+在用户要求「推到远程」或功能验收需要 Code Review 时：
+
+1. `git status` → `git add` 仅纳入本功能文件。
+2. `git commit -m "..."`.
+3. `git push -u origin <当前分支>`.
+4. 创建 PR：**优先**用户已配置的 MCP（如 GitLens → GitHub `pull_request_create`），否则在终端执行 `gh pr create --title ... --body ...`（需本机 `gh auth login` 且有仓库权限）。**PR 标题与正文说明与本仓库约定一致时使用简体中文。**
+
+## 与 PROGRESS / dev-plan（仅本仓库）
+
+本仓库根目录存在 `PROGRESS.md` 与 `docs/dev-plan.md`。若本次提交收口某阶段：**同一轮改动**内需按 `AGENTS.md` 更新 **`PROGRESS.md`**、勾选 **`docs/dev-plan.md`**（如适用）；其它项目若无这两份文件则无此步骤。
+
+## 限制说明
+
+自动化 PR 依赖：**网络 + 已认证的 GitHub 凭据（`gh`/MCP）**；无凭据时应明确告知用户需要先登录或使用浏览器创建 PR。

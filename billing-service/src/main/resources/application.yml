@@ -4,6 +4,31 @@ server:
 spring:
   application:
     name: billing-service
+  datasource:
+    url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  codec:
+    max-in-memory-size: 4MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 与用户中心签发 JWT 对齐；用环境变量 JWT_SECRET 覆盖（勿写 ${JWT_SECRET:...} 自引用）
+JWT_SECRET: dev-only-change-me-32bytes-minimum!!
+
+# 网关 / 适配器调用内部接口时携带的令牌；可用环境变量 BILLING_INTERNAL_TOKEN 覆盖（勿写 ${BILLING_INTERNAL_TOKEN:...} 以防自引用）
+BILLING_INTERNAL_TOKEN: dev-internal-token
+
+tokenhub:
+  billing:
+    allow-mock-deposit: ${ALLOW_MOCK_DEPOSIT:false}
+    reconciliation-enabled: ${BILLING_RECONCILIATION_ENABLED:false}
+    reconciliation-cron: ${BILLING_RECONCILIATION_CRON:0 0 3 * * ?}
+  payment:
+    base-url: ${TOKENS_GATEWAY_PAYMENT_URI:http://127.0.0.1:8104}
 
 management:
   endpoints:

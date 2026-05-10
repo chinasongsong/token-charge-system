@@ -23,8 +23,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 
 | 场景 | 做法 |
 |---|---|
-| **全新 MySQL 容器**（`mysql_data` 卷为空或首次 `docker compose up`） | 容器启动时会自动按文件名顺序执行 `deploy/sql/` 下脚本：`V1__*.sql` → `V2__*.sql` → **`V3__seed_model_providers_deepseek.sql`**，无需手工执行。 |
-| **已有库**（容器以前跑过，或数据卷里已有数据） | **不会**再次执行初始化目录；新增脚本需手工执行一次，例如在仓库根目录：`mysql -h127.0.0.1 -P3306 -uroot -p token_charge < deploy/sql/V3__seed_model_providers_deepseek.sql`（端口/用户与 `.env` 一致）。也可用任意客户端打开 `V3__*.sql` 执行；该文件含 `ON DUPLICATE KEY UPDATE`，对 `code=deepseek` 可重复执行。 |
+| **全新 MySQL 容器**（`mysql_data` 卷为空或首次 `docker compose up`） | 容器启动时会自动按文件名顺序执行 `deploy/sql/` 下脚本：`V1__*.sql` → `V2__*.sql` → **`V3__*.sql` → `V4__*.sql`**（含 `V4__seed_model_prices_deepseek_v4_flash.sql`），无需手工执行。 |
+| **已有库**（容器以前跑过，或数据卷里已有数据） | **不会**再次执行初始化目录；新增脚本需手工执行一次，例如在仓库根目录：`mysql ... < deploy/sql/V3__....sql` / **`V4__...sql`**（端口/用户与 `.env` 一致）。也可用客户端直接执行；V3/V4 脚本支持对同一供应商/模型幂等更新。 |
 
 ## user-center-service（P1 起）
 
@@ -63,3 +63,10 @@ curl -s http://localhost:8101/user/me -H "Authorization: Bearer <上一步返回
 ```bash
 curl -s http://localhost:8080/v1/models -H "Authorization: Bearer any-opaque-or-jwt"
 ```
+
+## billing-service + P3 计费（8103）
+
+1. **Redis**：`gateway-service`（P3 起）默认连接 **`127.0.0.1:6379`**（与 Compose `redis` 服务一致）；未启动 Redis 时网关进程会连接失败。
+2. **库**：除 **`V1`–`V3`** 外需加载 **`V4__seed_model_prices_deepseek_v4_flash.sql`**（手动或重建卷后自动）。
+3. 启动：`mvn -pl billing-service spring-boot:run`，与 **`user-center`** 共用 **`JWT_SECRET`**（用户侧接口）；**`BILLING_INTERNAL_TOKEN`** 需与网关、适配器 **`BILLING_INTERNAL_TOKEN`** 一致。
+4. **网关路由**：`/apikeys`、`/dashboard`、`/billing`、`/v1/usage` → **8103**；其余 **`/v1/**` → 8102。
