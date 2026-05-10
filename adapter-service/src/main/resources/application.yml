@@ -21,6 +21,32 @@ tokenhub:
     default-chat-model: deepseek-v4-flash
     deepseek-api-key: ${DEEPSEEK_API_KEY:}
     deepseek-base-url-fallback: ${DEEPSEEK_BASE_URL_FALLBACK:https://api.deepseek.com}
+    failover-enabled: ${ADAPTER_FAILOVER_ENABLED:true}
+    zhipu-provider-code: zhipu
+    zhipu-api-key: ${ZHIPU_API_KEY:}
+    zhipu-base-url-fallback: ${ZHIPU_BASE_URL_FALLBACK:https://open.bigmodel.cn/api/paas/v4}
+    zhipu-default-chat-model: glm-4-flash
+    routing:
+      weight-deepseek: ${ROUTING_WEIGHT_DEEPSEEK:70}
+      weight-zhipu: ${ROUTING_WEIGHT_ZHIPU:30}
+  billing:
+    settlement-enabled: ${BILLING_SETTLEMENT_ENABLED:true}
+    base-url: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      deepseek:
+        registerHealthIndicator: true
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 15s
+  retry:
+    instances:
+      deepseek:
+        maxAttempts: 2
+        waitDuration: 200ms
 
 management:
   endpoints:

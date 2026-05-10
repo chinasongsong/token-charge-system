@@ -1,4 +1,4 @@
-package com.tokenhub.adapter.infrastructure.deepseek;
+package com.tokenhub.adapter.infrastructure.zhipu;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,10 +24,13 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 智谱 OpenAI 兼容：{@code POST {base}/chat/completions}，base 形如 {@code https://open.bigmodel.cn/api/paas/v4}。
+ */
 @Component
-public class DeepSeekProviderAdapter implements ProviderAdapter {
+public class ZhipuProviderAdapter implements ProviderAdapter {
 
-  private static final Logger log = LoggerFactory.getLogger(DeepSeekProviderAdapter.class);
+  private static final Logger log = LoggerFactory.getLogger(ZhipuProviderAdapter.class);
 
   private final RestTemplate restTemplate;
   private final ObjectMapper objectMapper;
@@ -37,14 +40,14 @@ public class DeepSeekProviderAdapter implements ProviderAdapter {
   private final String fallbackBaseUrl;
   private final String catalogModelId;
 
-  public DeepSeekProviderAdapter(
+  public ZhipuProviderAdapter(
       RestTemplate adapterRestTemplate,
       ObjectMapper objectMapper,
       ModelProviderRegistry registry,
-      @Value("${tokenhub.adapter.provider-code:deepseek}") String providerCode,
-      @Value("${tokenhub.adapter.deepseek-api-key:}") String apiKey,
-      @Value("${tokenhub.adapter.deepseek-base-url-fallback:https://api.deepseek.com}") String fallbackBaseUrl,
-      @Value("${tokenhub.adapter.default-chat-model:deepseek-v4-flash}") String catalogModelId
+      @Value("${tokenhub.adapter.zhipu-provider-code:zhipu}") String providerCode,
+      @Value("${tokenhub.adapter.zhipu-api-key:}") String apiKey,
+      @Value("${tokenhub.adapter.zhipu-base-url-fallback:https://open.bigmodel.cn/api/paas/v4}") String fallbackBaseUrl,
+      @Value("${tokenhub.adapter.zhipu-default-chat-model:glm-4-flash}") String catalogModelId
   ) {
     this.restTemplate = adapterRestTemplate;
     this.objectMapper = objectMapper;
@@ -55,6 +58,10 @@ public class DeepSeekProviderAdapter implements ProviderAdapter {
     this.catalogModelId = catalogModelId;
   }
 
+  public boolean isConfigured() {
+    return apiKey != null && !apiKey.isBlank();
+  }
+
   @Override
   public String providerCode() {
     return providerCode;
@@ -62,11 +69,11 @@ public class DeepSeekProviderAdapter implements ProviderAdapter {
 
   @Override
   public JsonNode chat(JsonNode openAiRequestBody) {
-    if (apiKey == null || apiKey.isBlank()) {
-      throw new BusinessException(ErrorCode.INTERNAL, "缺少 DeepSeek 密钥：请配置环境变量 DEEPSEEK_API_KEY（或 tokenhub.adapter.deepseek-api-key）");
+    if (!isConfigured()) {
+      throw new BusinessException(ErrorCode.INTERNAL, "缺少智谱密钥：请配置环境变量 ZHIPU_API_KEY（或 tokenhub.adapter.zhipu-api-key）");
     }
     String base = resolveBaseUrl();
-    String url = base + "/v1/chat/completions";
+    String url = base + "/chat/completions";
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setBearerAuth(apiKey);
@@ -106,7 +113,7 @@ public class DeepSeekProviderAdapter implements ProviderAdapter {
       return registry.findEnabled(providerCode)
           .map(ModelProviderPo::getBaseUrl)
           .filter(s -> s != null && !s.isBlank())
-          .map(DeepSeekProviderAdapter::trimTrailingSlash)
+          .map(ZhipuProviderAdapter::trimTrailingSlash)
           .orElse(fallbackBaseUrl);
     } catch (Exception ex) {
       log.warn("读取 model_providers 失败，使用 fallback base_url: {}", ex.toString());
@@ -134,7 +141,7 @@ public class DeepSeekProviderAdapter implements ProviderAdapter {
         detail = tree.get("error").get("message").asText();
       }
     } catch (Exception ignored) {
-      // keep raw body snippet
+      // keep raw
     }
     ErrorCode code = ex.getStatusCode().is4xxClientError() ? ErrorCode.BAD_REQUEST : ErrorCode.INTERNAL;
     return new BusinessException(code, "上游模型错误: " + detail);
