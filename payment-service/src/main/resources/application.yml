@@ -4,6 +4,30 @@ server:
 spring:
   application:
     name: payment-service
+  datasource:
+    url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:change-me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+JWT_SECRET: dev-only-change-me-32bytes-minimum!!
+BILLING_INTERNAL_TOKEN: dev-internal-token
+MOCK_CALLBACK_SECRET: dev-mock-callback-secret-change
+
+tokenhub:
+  billing:
+    base-url: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
+  payment:
+    reconcile-enabled: ${PAYMENT_RECONCILE_ENABLED:false}
+    reconcile-cron: ${PAYMENT_RECONCILE_CRON:0 */10 * * * ?}
 
 management:
   endpoints:
