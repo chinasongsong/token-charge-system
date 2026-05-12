@@ -9,7 +9,9 @@
       <el-table-column prop="entryType" label="类型" width="100" />
       <el-table-column prop="quantity" label="Quantity" width="100" />
       <el-table-column prop="idempotencyKey" label="幂等键" min-width="160" show-overflow-tooltip />
-      <el-table-column prop="recordedAt" label="时间" min-width="170" />
+      <el-table-column prop="recordedAt" label="时间" min-width="170">
+        <template #default="{ row }">{{ formatApiDate(row.recordedAt) }}</template>
+      </el-table-column>
     </el-table>
   </div>
 </template>
@@ -17,6 +19,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { apiJson } from "../api/client";
+import { formatApiDate } from "../utils/formatApiDate";
 
 type Row = {
   id: number;
