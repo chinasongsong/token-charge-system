@@ -2,6 +2,7 @@ package com.tokenhub.gateway.infrastructure.web;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.tokenhub.common.security.apikey.ApiKeySupport;
+import com.tokenhub.gateway.infrastructure.cache.ApiKeyResolutionCache;
 import com.tokenhub.gateway.infrastructure.json.GatewayJsonResponses;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ import reactor.core.publisher.Mono;
 public class BillingApiKeyResolveGatewayFilter implements GlobalFilter, Ordered {
 
   private final WebClient webClient;
+  private final ApiKeyResolutionCache resolutionCache;
 
   @Value("${tokenhub.gateway.billing-base-url}")
   private String billingBaseUrl;
@@ -32,8 +34,12 @@ public class BillingApiKeyResolveGatewayFilter implements GlobalFilter, Ordered 
   @Value("${tokenhub.gateway.internal-token}")
   private String internalToken;
 
-  public BillingApiKeyResolveGatewayFilter(WebClient.Builder webClientBuilder) {
+  public BillingApiKeyResolveGatewayFilter(
+      WebClient.Builder webClientBuilder,
+      ApiKeyResolutionCache resolutionCache
+  ) {
     this.webClient = webClientBuilder.build();
+    this.resolutionCache = resolutionCache;
   }
 
   @Override
@@ -61,32 +67,61 @@ public class BillingApiKeyResolveGatewayFilter implements GlobalFilter, Ordered 
     }
 
     String fingerprint = ApiKeySupport.sha256HexUtf8(bearer);
+
+    return resolutionCache.get(fingerprint)
+        .flatMap(entry -> {
+          if (entry.negative()) {
+            return rejectUnauthorized(exchange);
+          }
+          return forwardWithResolution(exchange, chain, request, entry.userId(), entry.apiKeyId());
+        })
+        .switchIfEmpty(Mono.defer(() -> resolveFromBilling(exchange, chain, request, fingerprint)));
+  }
+
+  private Mono<Void> resolveFromBilling(
+      ServerWebExchange exchange,
+      GatewayFilterChain chain,
+      ServerHttpRequest request,
+      String fingerprint
+  ) {
     String base = trimTrailingSlash(billingBaseUrl);
     String url = base + "/internal/api-keys/by-fingerprint/" + fingerprint;
-
     return webClient
         .get()
         .uri(url)
         .header("X-Internal-Token", internalToken)
         .retrieve()
         .bodyToMono(ApiKeyResolveBody.class)
-        .flatMap(body -> {
-          ServerHttpRequest mutated = request.mutate()
-              .header(GatewayIngressHeaders.USER_ID, String.valueOf(body.userId()))
-              .header(GatewayIngressHeaders.API_KEY_ID, String.valueOf(body.apiKeyId()))
-              .build();
-          return chain.filter(exchange.mutate().request(mutated).build());
-        })
-        .onErrorResume(ex -> {
-          String traceId = Objects.toString(exchange.getAttribute(TraceGatewayFilter.TRACE_ATTR), "");
-          return GatewayJsonResponses.writeBusiness(
-              exchange.getResponse(),
-              HttpStatus.UNAUTHORIZED.value(),
-              traceId,
-              "I401001",
-              "无效的 API Key"
-          );
-        });
+        .flatMap(body ->
+            resolutionCache.putPresent(fingerprint, body.userId(), body.apiKeyId())
+                .then(forwardWithResolution(exchange, chain, request, body.userId(), body.apiKeyId()))
+        )
+        .onErrorResume(ex -> resolutionCache.putNegative(fingerprint).then(rejectUnauthorized(exchange)));
+  }
+
+  private static Mono<Void> forwardWithResolution(
+      ServerWebExchange exchange,
+      GatewayFilterChain chain,
+      ServerHttpRequest request,
+      long userId,
+      long apiKeyId
+  ) {
+    ServerHttpRequest mutated = request.mutate()
+        .header(GatewayIngressHeaders.USER_ID, String.valueOf(userId))
+        .header(GatewayIngressHeaders.API_KEY_ID, String.valueOf(apiKeyId))
+        .build();
+    return chain.filter(exchange.mutate().request(mutated).build());
+  }
+
+  private static Mono<Void> rejectUnauthorized(ServerWebExchange exchange) {
+    String traceId = Objects.toString(exchange.getAttribute(TraceGatewayFilter.TRACE_ATTR), "");
+    return GatewayJsonResponses.writeBusiness(
+        exchange.getResponse(),
+        HttpStatus.UNAUTHORIZED.value(),
+        traceId,
+        "I401001",
+        "无效的 API Key"
+    );
   }
 
   private static String trimTrailingSlash(String base) {
