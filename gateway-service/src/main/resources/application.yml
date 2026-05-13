@@ -61,6 +61,10 @@ tokenhub:
       enabled: ${GATEWAY_APIKEY_CACHE_ENABLED:false}
       positive-ttl-seconds: ${GATEWAY_APIKEY_CACHE_POS_TTL:60}
       negative-ttl-seconds: ${GATEWAY_APIKEY_CACHE_NEG_TTL:10}
+    risk:
+      enabled: ${GATEWAY_RISK_ENABLED:false}
+      enforce-allowlist: ${GATEWAY_RISK_ENFORCE_ALLOWLIST:false}
+      daily-quota: ${GATEWAY_RISK_DAILY_QUOTA:0}
 
 management:
   endpoints:
