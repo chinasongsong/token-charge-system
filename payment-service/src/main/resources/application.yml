@@ -28,6 +28,9 @@ tokenhub:
   payment:
     reconcile-enabled: ${PAYMENT_RECONCILE_ENABLED:false}
     reconcile-cron: ${PAYMENT_RECONCILE_CRON:0 */10 * * * ?}
+    reconcile-stale-init-warn-minutes: ${PAYMENT_RECONCILE_STALE_INIT_WARN_MINUTES:60}
+    channel-query:
+      mock-returns-paid: ${PAYMENT_CHANNEL_QUERY_MOCK_RETURNS_PAID:false}
 
 management:
   endpoints:
