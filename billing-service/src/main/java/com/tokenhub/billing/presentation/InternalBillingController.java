@@ -2,6 +2,7 @@ package com.tokenhub.billing.presentation;
 
 import com.tokenhub.billing.application.AccountBalanceApplicationService;
 import com.tokenhub.billing.application.BillingSettlementApplicationService;
+import com.tokenhub.billing.application.BillingSettlementFacade;
 import com.tokenhub.billing.presentation.dto.CreditRequest;
 import com.tokenhub.billing.presentation.dto.PreflightRequest;
 import com.tokenhub.billing.presentation.dto.SettlementRequest;
@@ -20,14 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalBillingController {
 
   private final AccountBalanceApplicationService accountBalanceApplicationService;
-  private final BillingSettlementApplicationService billingSettlementApplicationService;
+  private final BillingSettlementFacade billingSettlementFacade;
 
   public InternalBillingController(
       AccountBalanceApplicationService accountBalanceApplicationService,
-      BillingSettlementApplicationService billingSettlementApplicationService
+      BillingSettlementFacade billingSettlementFacade
   ) {
     this.accountBalanceApplicationService = accountBalanceApplicationService;
-    this.billingSettlementApplicationService = billingSettlementApplicationService;
+    this.billingSettlementFacade = billingSettlementFacade;
   }
 
   @PostMapping("/preflight")
@@ -49,7 +50,7 @@ public class InternalBillingController {
   @PostMapping("/settle")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void settle(@Valid @RequestBody SettlementRequest request) {
-    billingSettlementApplicationService.settle(
+    billingSettlementFacade.settle(
         new BillingSettlementApplicationService.SettlementCommand(
             request.traceId(),
             request.userId(),
