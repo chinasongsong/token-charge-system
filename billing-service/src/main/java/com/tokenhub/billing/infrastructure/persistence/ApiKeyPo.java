@@ -18,6 +18,10 @@ public class ApiKeyPo {
   private String status;
   @TableField("created_at")
   private LocalDateTime createdAt;
+  @TableField("expires_at")
+  private LocalDateTime expiresAt;
+  @TableField("last_used_at")
+  private LocalDateTime lastUsedAt;
 
   public Long getId() {
     return id;
@@ -65,5 +69,21 @@ public class ApiKeyPo {
 
   public void setCreatedAt(LocalDateTime createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public LocalDateTime getExpiresAt() {
+    return expiresAt;
+  }
+
+  public void setExpiresAt(LocalDateTime expiresAt) {
+    this.expiresAt = expiresAt;
+  }
+
+  public LocalDateTime getLastUsedAt() {
+    return lastUsedAt;
+  }
+
+  public void setLastUsedAt(LocalDateTime lastUsedAt) {
+    this.lastUsedAt = lastUsedAt;
   }
 }

@@ -7,6 +7,7 @@ import com.tokenhub.common.core.error.BusinessException;
 import com.tokenhub.common.core.error.ErrorCode;
 import com.tokenhub.common.security.apikey.ApiKeySupport;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,15 @@ public class ApiKeyApplicationService {
 
   @Transactional
   public CreatedApiKey create(long userId, String name) {
+    return create(userId, name, null);
+  }
+
+  /**
+   * O-7：支持创建时指定 {@code ttlDays}（null 表示永不过期）。生效后由
+   * {@link com.tokenhub.billing.infrastructure.schedule.ApiKeyExpirationScheduler} 在到期后翻转为 EXPIRED。
+   */
+  @Transactional
+  public CreatedApiKey create(long userId, String name, Integer ttlDays) {
     accountBalanceApplicationService.getOrCreate(userId);
     byte[] rnd = new byte[24];
     new SecureRandom().nextBytes(rnd);
@@ -43,6 +53,9 @@ public class ApiKeyApplicationService {
     row.setName(name);
     row.setFingerprint(fingerprint);
     row.setStatus("ACTIVE");
+    if (ttlDays != null && ttlDays > 0) {
+      row.setExpiresAt(LocalDateTime.now().plusDays(ttlDays));
+    }
     apiKeyMapper.insert(row);
     ApiKeyPo saved = apiKeyMapper.selectById(row.getId());
     return new CreatedApiKey(
@@ -76,7 +89,7 @@ public class ApiKeyApplicationService {
     ApiKeyPo row = apiKeyMapper.selectOne(
         new LambdaQueryWrapper<ApiKeyPo>().eq(ApiKeyPo::getFingerprint, fingerprint)
     );
-    if (row == null || !"ACTIVE".equalsIgnoreCase(row.getStatus())) {
+    if (row == null || !isActiveAndUnexpired(row)) {
       throw new BusinessException(ErrorCode.UNAUTHORIZED, "无效的 API Key");
     }
     return row;
@@ -86,9 +99,18 @@ public class ApiKeyApplicationService {
     ApiKeyPo row = apiKeyMapper.selectOne(
         new LambdaQueryWrapper<ApiKeyPo>().eq(ApiKeyPo::getFingerprint, fingerprint)
     );
-    if (row == null || !"ACTIVE".equalsIgnoreCase(row.getStatus())) {
+    if (row == null || !isActiveAndUnexpired(row)) {
       return Optional.empty();
     }
     return Optional.of(row);
+  }
+
+  /** O-7：状态 ACTIVE 且 {@code expires_at IS NULL OR > NOW()} 才视为可用。 */
+  static boolean isActiveAndUnexpired(ApiKeyPo row) {
+    if (row == null || !"ACTIVE".equalsIgnoreCase(row.getStatus())) {
+      return false;
+    }
+    LocalDateTime expiresAt = row.getExpiresAt();
+    return expiresAt == null || expiresAt.isAfter(LocalDateTime.now());
   }
 }

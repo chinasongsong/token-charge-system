@@ -45,6 +45,9 @@ tokenhub:
       backoff-base-seconds: ${BILLING_OUTBOX_BACKOFF_BASE_SECONDS:30}
     reservation:
       default-ttl-seconds: ${BILLING_RESERVATION_TTL_SECONDS:120}
+    apikey-expiration:
+      enabled: ${BILLING_APIKEY_EXPIRATION_ENABLED:false}
+      cron: ${BILLING_APIKEY_EXPIRATION_CRON:0 */5 * * * ?}
   payment:
     base-url: ${TOKENS_GATEWAY_PAYMENT_URI:http://127.0.0.1:8104}
 
