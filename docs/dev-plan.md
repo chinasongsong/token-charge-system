@@ -41,7 +41,73 @@
 | **P7** | 运营后台 + 风控 + 可观测 | W7-W9 | `ops-console`：供应商/价格/风控/告警；Prometheus + Grafana；引入 RabbitMQ（请求日志/风控/账务三类队列） | §4、§8.1 |
 | **P8** | SSE 流式 + 客服 + 验收 | W9-W12 | SSE 稳定化、`support_tickets`、压测、文档中心、SLA 分级 | §8、§9、§11.7 |
 
+### 2.1 账务与并发能力矩阵（面试考点 ↔ Px）
+
+> 说明：下列「本项目」指本仓库当前实现；**扩展**表示规划在后续 Px 或未落代码的能力。
+
+| 面试考点 | 本项目落点 | 主要路径 / 机制 | 阶段 |
+|----------|--------------|-----------------|------|
+| 扣费幂等、防重复结算 | `traceId` → `request_orders.idempotency_key`；先插 `PENDING` 再扣款 | `BillingSettlementApplicationService` | P3 |
+| 余额并发、防超扣 | `account_balance.version` 乐观锁 + 重试 | `AccountBalanceApplicationService` | P3 |
+| 充值入账幂等 | `sourceRef` / 订单号 + `balance_topup_receipt` `INSERT IGNORE` | `AccountBalanceApplicationService#creditIdempotent` | P5 |
+| 回调并发与重复回调 | Redis `SET NX` 订单短锁，无 Redis 时 JVM 锁 | `PaymentCallbackOrderLock`、`PaymentCallbackApplicationService` | P5 |
+| 支付成功必达（补偿） | **不**对未支付 `INIT` 自动入账；内部 **`POST /internal/payments/orders/retry-credit`** 在确认渠道已支付后幂等重试；调度器仅观测 stale INIT | `PaymentReconciliationScheduler`、`InternalPaymentController` | P5 |
+| 平台内对账（短款 / 卡单） | 定时统计：`COMPLETED` 缺 `usage_ledger`；`PENDING` 超时 | `BillingReconciliationScheduler`、`RequestOrderMapper` SQL | P5 |
+| 网关限流 | Redis 秒级桶 | `ApiKeyRedisRateLimitGatewayFilter` | P3 |
+| 余额预检 | `POST /v1/chat/completions` 前调 billing | `BillingPreflightGatewayFilter` | P3 |
+| API Key 不明文存储 | SHA-256 指纹 | `ApiKeyApplicationService`、`ApiKeySupport` | P3 |
+| 分布式锁（Redisson）串行扣费 | **扩展**（当前以 DB 乐观锁 + 幂等为主） | — | P7+ 可选 |
+| MQ 异步入账 / 削峰 | **扩展**（P7 RabbitMQ）；当前 adapter→billing 同步 HTTP | `BillingSettlementClient` | P7 |
+| T+1 与渠道账单核对 | **扩展**（启用对账任务后先做平台内自检；三方比对后续接通道） | `BillingReconciliationScheduler` | P5+ |
+
+### 2.2 能力与面试清单对照（是否具备）
+
+> **判定**：**具备**＝主路径已有可运行实现；**部分具备**＝有替代方案、仅占位或仅观测；**不具备**＝未实现或未纳入当前代码路径。
+
+| 能力点（面试表述） | 是否具备 | 本项目现状（简要） |
+|--------------------|----------|----------------------|
+| Redisson / 用户维度分布式锁串行扣费 | **不具备** | 扣费并发靠 `account_balance` **乐观锁** + `traceId` **幂等**；未引入 Redisson |
+| 接口幂等、防重复扣费 | **具备** | `request_orders.idempotency_key`、充值 `sourceRef` + 收据表；支付回调订单级锁 |
+| 先校验余额再扣减 + 事务 | **部分具备** | 网关 **preflight** 先挡零余额；结算 **`@Transactional`** 内计价+扣减+流水；**非**「预扣→推理→冲正」长事务 |
+| 异步落账、MQ、最终一致性 | **不具备** | adapter→billing **同步 HTTP** settle；P7 计划 RabbitMQ |
+| T+1 对账与自动平账长短款 | **部分具备** | billing **平台内**异常统计（缺流水、卡 `PENDING`）日志；**无**自动调账、**无**渠道账单对平 |
+| 单机锁为何不够 / 分布式锁必要性 | **文档层面** | 工程共识已写在 §2.1；代码未用分布式锁做扣费 |
+| Redis 缓存 API Key / 用户信息 / 模型配置 | **不具备** | 网关解析 Key 为 **HTTP 调 billing**；热点元数据未 Redis 缓存 |
+| Redis 分布式锁做扣费 | **不具备** | 支付回调为 **SET NX 短锁**；扣费链路无 Redis 锁 |
+| Redis 限流、防刷 | **部分具备** | 网关 **秒级 QPS 桶**（`X-Api-Key-Id` / `X-User-Id`）；**无** IP 风控、**无** 日/月消耗硬限额 |
+| Redis 缓存词元余额 | **不具备** | 余额以 **MySQL** 为准；preflight **实时查 billing** |
+| API Key 不明文、摘要入库 | **具备** | 指纹 `sha256`；创建时明文仅一次返回 |
+| API Key IP 白名单、模型权限、日/月限额 | **不具备** | 可运营配置未落地；P7 风控扩展 |
+| API Key 过期自动失效 | **不具备** | 仅有 **ACTIVE/DISABLED** 等状态，无到期字段逻辑 |
+| Header 携带 Key、禁 URL 传参 | **具备** | `Authorization: Bearer` |
+| 支付回调幂等 | **具备** | 订单锁 + billing `sourceRef` 入账幂等 |
+| MQ 异步入账 | **不具备** | 见上；RabbitMQ P7 引入 |
+| 定时补偿（回调丢失） | **部分具备** | **不**自动给未支付 `INIT` 入账；**内部 retry-credit** + **INIT 超龄观测** |
+| 订单状态可回溯 | **部分具备** | `payment_orders` **INIT/PAID** 等；无完整审计状态机 UI |
+| 高并发：Redis 热点缓存 | **不具备** | 限流用 Redis；业务缓存未做 |
+| 高并发：MQ 削峰、计费异步化 | **不具备** | P7 |
+| 高并发：限流 / 熔断 / 降级 | **部分具备** | 网关限流；adapter **Resilience4j** 熔断/重试/故障切换（P4） |
+| 模型多节点负载、智能路由 | **部分具备** | **加权 + 主备 failover**；非全局 LB 集群自治 |
+| 读写分离、热点用户缓存 | **不具备** | 单库 MyBatis；无只读副本与热点账户缓存 |
+
+### 2.3 优化项 backlog（与面试清单缺口对齐）
+
+> 下列为 **跨阶段优化记录**；实施时在对应 **Px** 中拆任务、勾选并同步 **`PROGRESS.md`**。
+
+- [ ] **O-1**（扣费并发）可选引入 **Redisson** 或 **用户分片 + DB 悲观锁** 策略，评估与现有乐观锁并存时的热点与死锁风险（目标阶段：**P7** 技术预研 / **P8** 压测后定稿）。
+- [ ] **O-2**（异步账务）adapter 结算改为 **Outbox + RabbitMQ**（或 Redis Stream）投递，`billing-service` 消费幂等入账；失败重试与死信队列（**P7**）。
+- [ ] **O-3**（预扣 / 长事务）网关或 billing **预占额度** + 请求结束 **冲正/确认**（与流式计量 **P8** 联动）。
+- [ ] **O-4**（对账闭环）渠道 **T+1 对账文件**解析、长短款 **工单/调账** API，与 `BillingReconciliationScheduler` 告警联动（**P5+** 接真实渠道后 / **ops-console**）。
+- [ ] **O-5**（Redis 缓存）billing **按 fingerprint 缓存 API Key 解析**、可选 **余额只读缓存**（短 TTL + 失效策略），降低网关/billing QPS（**P7**）。
+- [ ] **O-6**（风控与配额）网关 **IP 允许列表**、**日/月 token 或金额配额**、异常调用 **封禁**（**P7**）。
+- [ ] **O-7**（API Key 生命周期）`expires_at`、自动失效 Job、轮换策略（**P6/P7**）。
+- [ ] **O-8**（支付补偿自动化）对接 **渠道查单 API**，仅当 PSP 返回已支付时才调 **`/internal/payments/orders/retry-credit`**（**P5+** 真实渠道）。
+- [ ] **O-9**（读扩展）MySQL **读写分离**、热点用户 **账户行/余额** 缓存与降级路径（**P7+**）。
+
+> **技术设计展开**：O-1～O-9 对应的技术设计文档位于 **`docs/TDD/`**（见 [`docs/TDD/README.md`](./TDD/README.md) 索引与 [`docs/TDD/_template/技术设计文档模板.md`](./TDD/_template/技术设计文档模板.md) 标准章节）。
+
 ---
+
 
 ## 3. 阶段详情
 
@@ -146,10 +212,10 @@
 - [x] P5-1 `pricing_plans` + `user_subscriptions` Entity 与 CRUD。
 - [x] P5-2 `payment_orders` 下单接口 `POST /billing/recharge`、`POST /billing/subscribe`（另含直连充值与 `POST /payments/mock/checkout` 异步单）。
 - [x] P5-3 Mock 支付回调端点 + 签名校验骨架（生产替换为微信/支付宝）。
-- [x] P5-4 回调幂等（基于 `order_no` + Redis/进程内短锁）+ 失败补偿任务（`payment`/`billing` 定时占位）。
+- [x] P5-4 回调幂等（基于 `order_no` + Redis SET NX / JVM 短锁）+ **支付调度观测**（`INIT` 数量与超龄告警；**不**自动入账未支付单）+ **内部重试入账** `POST /internal/payments/orders/retry-credit`（`X-Internal-Token`，确认渠道已支付后使用）+ **计费调度自检**（`COMPLETED` 缺流水、`PENDING` 超时计数）。
 - [x] P5-5 退款 `POST /billing/refund/apply` + 审核状态机（申请落库 + 状态字段；审批流简化）。
 - [x] P5-6 `invoices` 开票占位（先生成 PDF 编号，不接真实税控）。
-- [x] P5-7 日终对账定时任务（与三方账单比对，当前为可开关占位任务）。
+- [x] P5-7 日终对账定时任务（**平台内**订单与流水一致性自检；与三方账单比对在生产接通道后扩展）。
 
 **验收**
 - Mock 支付 → 余额到账 → 重复回调不重复加钱（幂等通过）→ 退款流程闭环。
