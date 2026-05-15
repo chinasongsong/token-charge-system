@@ -6,9 +6,10 @@ import RechargeView from "../views/RechargeView.vue";
 import SupportView from "../views/SupportView.vue";
 import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
-import ComingSoonView from "../views/ComingSoonView.vue";
 import ExperienceView from "../views/ExperienceView.vue";
 import UsageDetailView from "../views/UsageDetailView.vue";
+import ApiKeysView from "../views/ApiKeysView.vue";
+import BillingOrdersView from "../views/BillingOrdersView.vue";
 import { useSessionStore } from "../stores/session";
 
 export const ROUTE_CONSOLE_PREFIX = "/console";
@@ -36,20 +37,9 @@ const router = createRouter({
       redirect: `${ROUTE_CONSOLE_PREFIX}/dashboard`,
       children: [
         { path: "dashboard", name: "console-dashboard", component: DashboardView },
-        {
-          path: "api-keys",
-          component: ComingSoonView,
-          meta: {
-            title: "KEY 管理",
-            description: "接入 POST/GET/PATCH /apikeys（billing-service），首期可只做列表与禁用。",
-          },
-        },
+        { path: "api-keys", name: "console-api-keys", component: ApiKeysView },
         { path: "recharge", name: "console-recharge", component: RechargeView },
-        {
-          path: "recharge-records",
-          component: ComingSoonView,
-          meta: { title: "充值明细", description: "对齐 payment_orders / 账务回调记录查询。" },
-        },
+        { path: "recharge-records", name: "console-billing-orders", component: BillingOrdersView },
         {
           path: "usage",
           name: "console-usage",

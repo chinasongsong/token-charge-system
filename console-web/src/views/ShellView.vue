@@ -24,7 +24,7 @@
         </el-menu-item>
         <el-menu-item :index="'/console/recharge-records'">
           <el-icon><List /></el-icon>
-          <span>充值明细</span>
+          <span>账单订单</span>
         </el-menu-item>
         <el-menu-item :index="'/console/usage'">
           <el-icon><Histogram /></el-icon>
