@@ -1,9 +1,14 @@
 package com.tokenhub.billing.presentation;
 
 import com.tokenhub.billing.application.AccountBalanceApplicationService;
+import com.tokenhub.billing.application.BalanceReservationApplicationService;
 import com.tokenhub.billing.application.BillingSettlementApplicationService;
+import com.tokenhub.billing.application.BillingSettlementFacade;
 import com.tokenhub.billing.presentation.dto.CreditRequest;
 import com.tokenhub.billing.presentation.dto.PreflightRequest;
+import com.tokenhub.billing.presentation.dto.ReservationCommitRequest;
+import com.tokenhub.billing.presentation.dto.ReservationReleaseRequest;
+import com.tokenhub.billing.presentation.dto.ReserveRequest;
 import com.tokenhub.billing.presentation.dto.SettlementRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,14 +25,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalBillingController {
 
   private final AccountBalanceApplicationService accountBalanceApplicationService;
-  private final BillingSettlementApplicationService billingSettlementApplicationService;
+  private final BillingSettlementFacade billingSettlementFacade;
+  private final BalanceReservationApplicationService balanceReservationApplicationService;
 
   public InternalBillingController(
       AccountBalanceApplicationService accountBalanceApplicationService,
-      BillingSettlementApplicationService billingSettlementApplicationService
+      BillingSettlementFacade billingSettlementFacade,
+      BalanceReservationApplicationService balanceReservationApplicationService
   ) {
     this.accountBalanceApplicationService = accountBalanceApplicationService;
-    this.billingSettlementApplicationService = billingSettlementApplicationService;
+    this.billingSettlementFacade = billingSettlementFacade;
+    this.balanceReservationApplicationService = balanceReservationApplicationService;
   }
 
   @PostMapping("/preflight")
@@ -49,7 +57,7 @@ public class InternalBillingController {
   @PostMapping("/settle")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void settle(@Valid @RequestBody SettlementRequest request) {
-    billingSettlementApplicationService.settle(
+    billingSettlementFacade.settle(
         new BillingSettlementApplicationService.SettlementCommand(
             request.traceId(),
             request.userId(),
@@ -60,5 +68,24 @@ public class InternalBillingController {
             request.outputTokens()
         )
     );
+  }
+
+  @PostMapping("/reserve")
+  public BalanceReservationApplicationService.ReservationView reserve(@Valid @RequestBody ReserveRequest request) {
+    return balanceReservationApplicationService.reserve(request.traceId(), request.userId(), request.amount());
+  }
+
+  @PostMapping("/reservations/commit")
+  public BalanceReservationApplicationService.ReservationView commitReservation(
+      @Valid @RequestBody ReservationCommitRequest request
+  ) {
+    return balanceReservationApplicationService.commit(request.traceId(), request.committedAmount());
+  }
+
+  @PostMapping("/reservations/release")
+  public BalanceReservationApplicationService.ReservationView releaseReservation(
+      @Valid @RequestBody ReservationReleaseRequest request
+  ) {
+    return balanceReservationApplicationService.release(request.traceId());
   }
 }

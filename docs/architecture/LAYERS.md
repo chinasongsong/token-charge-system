@@ -30,7 +30,7 @@
 | `user-center-service` | 注册/登录/JWT、`password/forgot|reset`：`UserApplicationService` 编排事务；`domain` 仅纯模型与仓储接口；`infrastructure.persistence` 承载 MyBatis-Plus；JWT 解析在 `infrastructure.web` 拦截器 | `common-web`、`common-security`、`common-mybatis` |
 | `adapter-service` | **P2 首家 DeepSeek（`deepseek-v4`）**、**P4 第二家**（DashScope 或智谱）协议适配：领域在 `domain`/`application`，HTTP 出站在 `infrastructure` | `common-web` |
 | `billing-service` | 账务不变量放于 `domain`；幂等与流水在 `application` | `common-web`，后续可加 `common-mybatis` |
-| `payment-service` | 下单/回调/对账：`application` 管事务，`infrastructure` 接 PSP SDK | `common-web` |
+| `payment-service` | 下单/回调/对账：`application` 管事务，`infrastructure` 含 Redis 回调短锁与**对账调度**；**`POST /internal/payments/orders/retry-credit`** 在 `presentation`（仅运维/服务间，验 `X-Internal-Token`） | `common-web` |
 | `ops-console` | RBAC + 管理与审计查询入口 | `common-web` |
 | `console-web`（前端） | 视图与路由守卫；经由 OpenAPI 契约对接后端 | N/A |
 

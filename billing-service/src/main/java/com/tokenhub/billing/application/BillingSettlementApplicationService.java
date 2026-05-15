@@ -24,19 +24,22 @@ public class BillingSettlementApplicationService {
   private final PricingService pricingService;
   private final AccountBalanceApplicationService accountBalanceApplicationService;
   private final ObjectMapper objectMapper;
+  private final SettlementOutboxWriter settlementOutboxWriter;
 
   public BillingSettlementApplicationService(
       RequestOrderMapper requestOrderMapper,
       UsageLedgerMapper usageLedgerMapper,
       PricingService pricingService,
       AccountBalanceApplicationService accountBalanceApplicationService,
-      ObjectMapper objectMapper
+      ObjectMapper objectMapper,
+      SettlementOutboxWriter settlementOutboxWriter
   ) {
     this.requestOrderMapper = requestOrderMapper;
     this.usageLedgerMapper = usageLedgerMapper;
     this.pricingService = pricingService;
     this.accountBalanceApplicationService = accountBalanceApplicationService;
     this.objectMapper = objectMapper;
+    this.settlementOutboxWriter = settlementOutboxWriter;
   }
 
   public record SettlementCommand(
@@ -109,5 +112,23 @@ public class BillingSettlementApplicationService {
     }
     ledger.setRecordedAt(LocalDateTime.now());
     usageLedgerMapper.insert(ledger);
+
+    // O-2 Outbox：与上述写入同事务追加 PENDING 事件，由 SettlementOutboxScheduler 异步发布。
+    Map<String, Object> event = new HashMap<>();
+    event.put("traceId", cmd.traceId());
+    event.put("userId", cmd.userId());
+    event.put("apiKeyId", cmd.apiKeyId());
+    event.put("providerCode", cmd.providerCode());
+    event.put("modelName", cmd.modelName());
+    event.put("inputTokens", cmd.inputTokens());
+    event.put("outputTokens", cmd.outputTokens());
+    event.put("amount", amount);
+    event.put("requestOrderId", pending.getId());
+    settlementOutboxWriter.append(
+        "request_order",
+        cmd.traceId(),
+        "billing.settled",
+        event
+    );
   }
 }

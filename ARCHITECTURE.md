@@ -1,5 +1,8 @@
 # ARCHITECTURE.md
 
+> **扩展阅读（十三章节全景、Mermaid 总图与部署说明）**：[`docs/architecture/整体技术架构.md`](docs/architecture/整体技术架构.md)  
+> **O-1～O-9 技术负债总表与收口流程**：[`docs/architecture/技术负债与路线图.md`](docs/architecture/技术负债与路线图.md)
+
 ## 系统目标
 
 构建一个统一聚合国内模型 API 的中转平台，对外暴露一致协议，对内适配多供应商，并提供 C 端用户控制台、计费、风控与运营能力。
@@ -37,7 +40,7 @@
 | `user-center-service` | `user-center-service` | 用户与认证：注册/登录/JWT、`users` / `user_devices` / 密码重置码表、设备登录轨迹（P1 已实现 HTTP 面） |
 | `adapter-service` | `adapter-service` | 供应商适配（**P2 起首家 DeepSeek / deepseek-v4**；P4 第二家 DashScope 或智谱双活） |
 | `billing-service` | `billing-service` | **P3**：API Key、余额、`model_prices` 计价、`request_orders`/`usage_ledger`；内部 `/internal/**` 供网关/适配器 |
-| `payment-service` | `payment-service` | 支付与对账（P5 起） |
+| `payment-service` | `payment-service` | 支付与对账（P5：Mock 回调签验、Redis 回调短锁、**内部重试入账**、**INIT 观测调度**；billing **平台内对账自检**） |
 | `ops-console` | `ops-console` | 运营控制面（P7 起） |
 | `console-web/` | （npm `console-web`） | C 端控制台（Vue 3 + Vite + TS，P6 丰富页面） |
 

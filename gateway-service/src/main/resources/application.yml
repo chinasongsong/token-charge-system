@@ -57,6 +57,14 @@ tokenhub:
     billing-base-url: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}
     internal-token: ${BILLING_INTERNAL_TOKEN:dev-internal-token}
     rate-limit-per-second: ${GATEWAY_RATE_LIMIT_PER_SECOND:60}
+    apikey-cache:
+      enabled: ${GATEWAY_APIKEY_CACHE_ENABLED:false}
+      positive-ttl-seconds: ${GATEWAY_APIKEY_CACHE_POS_TTL:60}
+      negative-ttl-seconds: ${GATEWAY_APIKEY_CACHE_NEG_TTL:10}
+    risk:
+      enabled: ${GATEWAY_RISK_ENABLED:false}
+      enforce-allowlist: ${GATEWAY_RISK_ENFORCE_ALLOWLIST:false}
+      daily-quota: ${GATEWAY_RISK_DAILY_QUOTA:0}
 
 management:
   endpoints:

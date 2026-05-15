@@ -9,6 +9,10 @@ spring:
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:change-me}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
   codec:
     max-in-memory-size: 4MB
 
@@ -27,6 +31,23 @@ tokenhub:
     allow-mock-deposit: ${ALLOW_MOCK_DEPOSIT:false}
     reconciliation-enabled: ${BILLING_RECONCILIATION_ENABLED:false}
     reconciliation-cron: ${BILLING_RECONCILIATION_CRON:0 0 3 * * ?}
+    reconciliation-stale-pending-hours: ${BILLING_RECONCILIATION_STALE_PENDING_HOURS:1}
+    balance-lock:
+      enabled: ${BILLING_BALANCE_LOCK_ENABLED:false}
+      ttl-ms: ${BILLING_BALANCE_LOCK_TTL_MS:5000}
+      max-wait-ms: ${BILLING_BALANCE_LOCK_MAX_WAIT_MS:1500}
+      spin-sleep-ms: ${BILLING_BALANCE_LOCK_SPIN_SLEEP_MS:30}
+    outbox:
+      enabled: ${BILLING_OUTBOX_ENABLED:false}
+      fixed-delay-ms: ${BILLING_OUTBOX_FIXED_DELAY_MS:2000}
+      batch-size: ${BILLING_OUTBOX_BATCH_SIZE:50}
+      max-attempts: ${BILLING_OUTBOX_MAX_ATTEMPTS:8}
+      backoff-base-seconds: ${BILLING_OUTBOX_BACKOFF_BASE_SECONDS:30}
+    reservation:
+      default-ttl-seconds: ${BILLING_RESERVATION_TTL_SECONDS:120}
+    apikey-expiration:
+      enabled: ${BILLING_APIKEY_EXPIRATION_ENABLED:false}
+      cron: ${BILLING_APIKEY_EXPIRATION_CRON:0 */5 * * * ?}
   payment:
     base-url: ${TOKENS_GATEWAY_PAYMENT_URI:http://127.0.0.1:8104}
 

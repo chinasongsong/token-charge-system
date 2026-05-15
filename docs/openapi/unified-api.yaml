@@ -12,6 +12,8 @@ servers:
     description: Local gateway placeholder
   - url: http://localhost:8101
     description: user-center-service direct (dev)
+  - url: http://localhost:8104
+    description: payment-service direct (dev internal)
 
 tags:
   - name: Auth
@@ -143,6 +145,27 @@ paths:
         '200':
           description: Model catalog
 
+  /internal/payments/orders/retry-credit:
+    post:
+      tags: [Payments]
+      summary: 确认渠道已收款后重试幂等入账（直连 payment-service；Header X-Internal-Token）
+      security: [{ internalToken: [] }]
+      servers:
+        - url: http://localhost:8104
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderNo]
+              properties:
+                orderNo:
+                  type: string
+      responses:
+        '200':
+          description: 订单入账结果（与 Mock 回调入账语义一致）
+
 components:
   securitySchemes:
     bearerAuth:
@@ -154,6 +177,11 @@ components:
       in: header
       name: Authorization
       description: Use `Bearer sk_...` for API-key style calls routed via gateway filters.
+    internalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Shared secret for service-to-service internal endpoints (payment/billing).
 
   schemas:
     ApiResponseUserProfile:

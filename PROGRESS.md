@@ -138,17 +138,17 @@
 
 ### 本阶段做了什么
 
-- **`billing-service`**：幂等入账 **`POST /internal/billing/credit`**；套餐与订阅占位、退款/发票申请接口、**`BillingReconciliationScheduler`** 对账开关占位；**`deploy/sql/V7__p5_p7_p8_extensions.sql`** 等扩展表。
-- **`payment-service`（8104）**：**`POST /payments/mock/recharge`**（同步入账）；**`POST /payments/mock/checkout`**（`INIT` 订单）；**`POST /payments/mock/callback`**（HMAC-SHA256 **`MOCK_CALLBACK_SECRET`**、时间窗、订单与用户/金额校验）；**`PaymentCallbackOrderLock`**（Redis SET NX 或 JVM 短锁）与入账幂等；**`PaymentReconciliationScheduler`** 扫描 `INIT` 占位；**`spring-boot-starter-data-redis`** 与 **`POST /internal/payments/recharge`** 内部幂等键。
+- **`billing-service`**：幂等入账 **`POST /internal/billing/credit`**；套餐与订阅占位、退款/发票申请接口；**`BillingReconciliationScheduler`**（可开关：统计 **`COMPLETED` 缺 `USAGE` 流水**、**超时 `PENDING`**，打 WARN/INFO；**`tokenhub.billing.reconciliation-stale-pending-hours`**）；**`deploy/sql/V7__p5_p7_p8_extensions.sql`** 等扩展表。
+- **`payment-service`（8104）**：**`POST /payments/mock/recharge`**（同步入账）；**`POST /payments/mock/checkout`**（`INIT` 订单）；**`POST /payments/mock/callback`**（HMAC-SHA256 **`MOCK_CALLBACK_SECRET`**、时间窗、订单与用户/金额校验）；**`PaymentCallbackOrderLock`**（Redis SET NX 或 JVM 短锁）与入账幂等；**`PaymentReconciliationScheduler`**（可开关：统计 `INIT`、按龄 **WARN** 超龄 backlog，**不**自动入账未支付单）；**`POST /internal/payments/orders/retry-credit`**（`X-Internal-Token`，确认渠道已支付后幂等重试入账）；**`spring-boot-starter-data-redis`** 与 **`POST /internal/payments/recharge`** 内部幂等键。
 - **`gateway-service`**：**`/payments/**` → payment；**`/billing/**` → billing。
 
 ### 关键交付物（路径）
 
-`deploy/sql/V6__balance_topup_receipts.sql`、`billing-service/.../InternalBillingController.java`、`AccountBalanceApplicationService.java`、`payment-service`（`MockPaymentApplicationService`、`MockPaymentController`、`BillingCreditClient`）、`gateway-service/application.yml`。
+`deploy/sql/V6__balance_topup_receipts.sql`、`billing-service/.../InternalBillingController.java`、`AccountBalanceApplicationService.java`、`RequestOrderMapper`（对账 SQL）、`BillingReconciliationScheduler.java`、`payment-service`（`MockPaymentApplicationService`、`MockPaymentController`、`InternalPaymentController`、`PaymentReconciliationScheduler`）、`gateway-service/application.yml`。
 
 ### 验收与检查
 
-- 登录 JWT → **`POST /payments/mock/recharge`**（经 **8080**）→ **`GET /dashboard/summary`** 余额增加；重复 **`sourceRef`**（订单号）不重复入账。
+- 置 **`BILLING_RECONCILIATION_ENABLED=true`**（可选 **`BILLING_RECONCILIATION_STALE_PENDING_HOURS`**）后 billing 日终任务输出自检日志；置 **`PAYMENT_RECONCILE_ENABLED=true`** 后 payment 周期输出 `INIT` 与超龄告警；在人工确认某笔 `INIT` 已在渠道侧支付后，对 **8104** 调 **`POST /internal/payments/orders/retry-credit`**（`X-Internal-Token`）应幂等入账；重复 **`sourceRef`**（订单号）不重复入账。
 
 ### 遗留 / 下一阶段的输入
 
@@ -209,7 +209,7 @@
 ### 本阶段做了什么
 
 - **`user-center-service`**：**`GET/POST /user/support/tickets`**；**`GET/POST /user/support/tickets/{id}/messages`**（**`support_ticket_messages`**，用户角色 **`USER`**）；**`SupportTicketMessageMapper`** 与预览字段更新。
-- **`billing-service`**：**`BillingReconciliationScheduler`**（占位）；**SSE 流式**：仍以同步 **`/v1/chat/completions`** 与网关长超时为准，专用 `text/event-stream` 透传仍待。
+- **`billing-service`**：与 **P5** 对齐的 **`BillingReconciliationScheduler`** 平台内自检（详见 **P5** 章节）；**SSE 流式**：仍以同步 **`/v1/chat/completions`** 与网关长超时为准，专用 `text/event-stream` 透传仍待。
 
 ### 关键交付物（路径）
 
@@ -222,3 +222,43 @@
 ### 遗留 / 下一阶段的输入
 
 - **SSE** 端到端、AGENT 回复与赔付、公告运营 API、压测与 MVP 验收清单 **`plan.md §9`**。
+
+---
+
+## P-Opt 待优化点（O-1～O-9）M1 骨架交付
+
+**完成状态**：开发中（每项 M1 骨架已合入主分支；M2/M3 待 P7/P8 联动）
+
+### 本阶段做了什么
+
+> 详表与「实现对照」见 [`docs/architecture/技术负债与路线图.md`](docs/architecture/技术负债与路线图.md) 与 `docs/TDD/O-0x-*.md` 第 18 节。
+
+- **O-1 扣费并发**：新增 `BalanceLock` SPI 与 Redis `SET NX`（JVM 回落）实现；`BillingSettlementFacade` 在事务外包裹 `settle`；默认关闭（`tokenhub.billing.balance-lock.enabled`），与乐观锁、`idempotency_key` 形成三重防护。
+- **O-2 异步账务**：建 `settlement_outbox` 表与 PO/Mapper；`SettlementOutboxWriter` 与 settle 同事务追加 `billing.settled`；`SettlementOutboxScheduler` 固定延时轮询并通过 `SettlementOutboxPublisher` 端口投递，失败按指数退避到 max-attempts；首版默认 Publisher 仅打印日志，P7 接 RabbitMQ 时通过 `@ConditionalOnMissingBean` 覆盖。
+- **O-3 预占额度**：建 `balance_reservations` 表（trace_id 唯一 + TTL）；新增 `BalanceReservationApplicationService` 与 `/internal/billing/reserve` `/reservations/commit` `/reservations/release` 内部端点；commit 仅状态翻转不直接扣款，扣款仍走 `/settle`。
+- **O-4 渠道对账**：建 `channel_reconciliation_batches/lines` 与 `adjustment_tickets` 表；`ChannelReconciliationApplicationService` 解析 CSV 并比对 `payment_orders`，产出 MATCHED / AMOUNT_MISMATCH / MISSING_LOCAL / LOCAL_INIT / LOCAL_OTHER；`/internal/payments/reconciliation/batches` 与 `/batches/{id}` 内部端点。
+- **O-5 API Key 解析缓存**：网关新增 `ApiKeyResolutionCache`（Reactive Redis），命中跳过 billing HTTP；正向/负向 TTL 分离，Redis 异常静默降级；开关 `tokenhub.gateway.apikey-cache.enabled`。
+- **O-6 网关风控**：新增 `IpRiskAndQuotaGatewayFilter`（Order 12），IP 黑白名单走 Redis Set，日配额走 `INCR rl:daily:{apiKeyId}:{yyyyMMdd}` 与 EXPIRE 2 天；超限 403/429 + 错误码；fail-open。
+- **O-7 API Key 生命周期**：`api_keys` 新增 `expires_at` / `last_used_at` 与索引；解析路径加「未过期」校验；`ApiKeyExpirationScheduler` 定时将到期 ACTIVE 翻转 EXPIRED；`create(...)` 支持可选 `ttlDays`，旧入口默认 null 保持兼容。
+- **O-8 支付补偿**：新增 `ChannelQueryPort` 端口与 `MockChannelQueryPort` 默认实现；`ChannelReconcileApplicationService` 在「本地 INIT + 渠道 PAID + 金额一致」三重校验后持订单短锁触发 `completePendingFromCallback`，UNKNOWN/UNPAID/AMOUNT_MISMATCH 一律拒绝；`/internal/payments/orders/{orderNo}/channel-reconcile` 端点；与 `/retry-credit` 共享锁与 billing sourceRef 入账幂等。
+- **O-9 读扩展**：`common-mybatis` 新增 `@ReadOnly` 注解、`RoutingContext`（嵌套 ThreadLocal Deque）、`ReadOnlyRoutingAspect`（Order 高于事务）、`DynamicRoutingDataSource`（未配 reader 时回 writer）、`DataSourceRoutingConfiguration`（`tokenhub.routing.enabled=true` 启用）；pom 引入 `starter-aop / starter-jdbc`。
+
+### 关键交付物（路径）
+
+- 数据库：`deploy/sql/V8__settlement_outbox.sql`、`V9__balance_reservations.sql`、`V10__channel_reconciliation.sql`、`V11__api_keys_lifecycle.sql`
+- billing：`application/{BalanceLock,BillingSettlementFacade,SettlementOutboxWriter,SettlementOutboxPublisher,BalanceReservationApplicationService}.java`、`infrastructure/redis/RedisBalanceLock.java`、`infrastructure/outbox/{LoggingSettlementOutboxPublisher,SettlementOutboxScheduler}.java`、`infrastructure/persistence/{SettlementOutbox*,BalanceReservation*,ApiKeyLifecycleMapper}.java`、`infrastructure/schedule/ApiKeyExpirationScheduler.java`、`presentation/InternalBillingController.java` 与 reservation DTO
+- gateway：`infrastructure/cache/ApiKeyResolutionCache.java`、`infrastructure/web/{BillingApiKeyResolveGatewayFilter,IpRiskAndQuotaGatewayFilter}.java`
+- payment：`application/{ChannelQueryPort,ChannelReconcileApplicationService,ChannelReconciliationApplicationService}.java`、`infrastructure/channel/MockChannelQueryPort.java`、`infrastructure/persistence/ChannelReconciliation*.java`、`presentation/{InternalPaymentController,InternalReconciliationController}.java`
+- 公共：`common/common-mybatis/src/.../routing/{ReadOnly,RoutingContext,ReadOnlyRoutingAspect,DynamicRoutingDataSource,DataSourceRoutingConfiguration}.java`
+- 文档：`docs/architecture/技术负债与路线图.md`、`docs/TDD/O-01.md…O-09.md` 第 18 节「实现对照」
+
+### 验收与检查
+
+- `mvn -q -DskipTests compile`（全 reactor 编译通过）；
+- `python scripts/check_boundaries.py`（无新增越层）；`python scripts/gc_scan.py`（关键文档齐全）；
+- 9 项 O-x 默认 **开关关闭**，开启后不可逆数据写入仅限新建表与新增列，**不破坏现有路径**。
+
+### 遗留 / 下一阶段的输入
+
+- **M2/M3 收口**：O-1 Redisson 看门狗续期与压测对照；O-2 RabbitMQ Publisher 与消费者 + DLQ；O-3 网关 `ReserveFilter` 与 SSE 尾包 commit；O-4 大文件流式解析与 ops 调账审批；O-5 即时 invalidation（PUBLISH/DEL）与余额只读缓存（仅展示）；O-6 ops-console DB 配置 IP 规则与差异化配额；O-7 控制台展示与轮换 UX；O-8 微信/支付宝官方查单 + `PaymentCompensationScheduler` 与 O-4 联动；O-9 业务接口实际标注 `@ReadOnly` + 副本健康度熔断。
+- 详细勾选仍以 [`docs/dev-plan.md`](docs/dev-plan.md) §2.3 为准。
