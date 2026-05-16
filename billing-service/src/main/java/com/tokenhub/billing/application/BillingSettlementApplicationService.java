@@ -49,7 +49,9 @@ public class BillingSettlementApplicationService {
       String providerCode,
       String modelName,
       long inputTokens,
-      long outputTokens
+      long outputTokens,
+      String idempotencyKey,      // 复合幂等键 userId:apiKeyId:clientKey
+      String idempotencySource    // CLIENT | TRACE_ID_FALLBACK
   ) {}
 
   @Transactional
@@ -57,9 +59,18 @@ public class BillingSettlementApplicationService {
     if (cmd.traceId() == null || cmd.traceId().isBlank()) {
       throw new BusinessException(ErrorCode.BAD_REQUEST, "traceId 不能为空");
     }
+
+    // O-10：使用复合幂等键（若提供）或回退 traceId
+    String effectiveIdempotencyKey = (cmd.idempotencyKey() != null && !cmd.idempotencyKey().isBlank())
+        ? cmd.idempotencyKey()
+        : cmd.traceId();
+    String idempotencySource = (cmd.idempotencySource() != null && !cmd.idempotencySource().isBlank())
+        ? cmd.idempotencySource()
+        : "TRACE_ID_FALLBACK";
+
     RequestOrderPo done = requestOrderMapper.selectOne(
         new LambdaQueryWrapper<RequestOrderPo>()
-            .eq(RequestOrderPo::getIdempotencyKey, cmd.traceId())
+            .eq(RequestOrderPo::getIdempotencyKey, effectiveIdempotencyKey)
     );
     if (done != null && "COMPLETED".equals(done.getBillingStatus())) {
       return;
@@ -75,7 +86,12 @@ public class BillingSettlementApplicationService {
     pending.setInputTokens(cmd.inputTokens());
     pending.setOutputTokens(cmd.outputTokens());
     pending.setAmount(0L);
-    pending.setIdempotencyKey(cmd.traceId());
+    pending.setIdempotencyKey(effectiveIdempotencyKey);
+    pending.setIdempotencySource(idempotencySource);
+    // 若客户端提供幂等键，设置过期时间（24小时后）
+    if ("CLIENT".equals(idempotencySource)) {
+      pending.setIdempotencyExpiresAt(LocalDateTime.now().plusHours(24));
+    }
     try {
       requestOrderMapper.insert(pending);
     } catch (DuplicateKeyException ex) {

@@ -103,8 +103,9 @@
 - [ ] **O-7**（API Key 生命周期）`expires_at`、自动失效 Job、轮换策略（**P6/P7**）。
 - [ ] **O-8**（支付补偿自动化）对接 **渠道查单 API**，仅当 PSP 返回已支付时才调 **`/internal/payments/orders/retry-credit`**（**P5+** 真实渠道）。
 - [ ] **O-9**（读扩展）MySQL **读写分离**、热点用户 **账户行/余额** 缓存与降级路径（**P7+**）。
+- [ ] **O-10**（客户端幂等键）解决 **traceId 职责混淆**，新增 `X-Idempotency-Key` 请求头，客户端可控制重试语义（技术重试幂等拦截 vs 业务重试生成新结果）；复合幂等键绑定用户身份防泄露滥用（**P3+**）。
 
-> **技术设计展开**：O-1～O-9 对应的技术设计文档位于 **`docs/TDD/`**（见 [`docs/TDD/README.md`](./TDD/README.md) 索引与 [`docs/TDD/_template/技术设计文档模板.md`](./TDD/_template/技术设计文档模板.md) 标准章节）。
+> **技术设计展开**：O-1～O-10 对应的技术设计文档位于 **`docs/TDD/`**（见 [`docs/TDD/README.md`](./TDD/README.md) 索引与 [`docs/TDD/_template/技术设计文档模板.md`](./TDD/_template/技术设计文档模板.md) 标准章节）。
 
 ---
 

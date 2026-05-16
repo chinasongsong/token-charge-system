@@ -123,6 +123,24 @@ paths:
       tags: [Models]
       summary: OpenAI-compatible chat (P2 non-stream, P8 stream)
       security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          description: >
+            客户端提供的幂等键（UUID v4 格式）。
+            用于技术重试场景：网络超时后使用相同幂等键重试，服务端幂等拦截返回相同结果。
+            若未提供，服务端自动回退使用 X-Trace-Id 作为幂等键。
+          required: false
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: X-Trace-Id
+          in: header
+          description: 观测追踪 ID（用于日志关联，不影响业务幂等）
+          required: false
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -136,6 +154,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatCompletionResponse'
+        '400':
+          description: 幂等键格式非法（必须是 UUID v4）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseError'
   /v1/models:
     get:
       tags: [Models]
