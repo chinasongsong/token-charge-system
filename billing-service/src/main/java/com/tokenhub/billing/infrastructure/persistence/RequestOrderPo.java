@@ -30,6 +30,10 @@ public class RequestOrderPo {
   private Long amount;
   @TableField("idempotency_key")
   private String idempotencyKey;
+  @TableField("idempotency_source")
+  private String idempotencySource;
+  @TableField("idempotency_expires_at")
+  private LocalDateTime idempotencyExpiresAt;
   @TableField("created_at")
   private LocalDateTime createdAt;
 
@@ -119,6 +123,22 @@ public class RequestOrderPo {
 
   public void setIdempotencyKey(String idempotencyKey) {
     this.idempotencyKey = idempotencyKey;
+  }
+
+  public String getIdempotencySource() {
+    return idempotencySource;
+  }
+
+  public void setIdempotencySource(String idempotencySource) {
+    this.idempotencySource = idempotencySource;
+  }
+
+  public LocalDateTime getIdempotencyExpiresAt() {
+    return idempotencyExpiresAt;
+  }
+
+  public void setIdempotencyExpiresAt(LocalDateTime idempotencyExpiresAt) {
+    this.idempotencyExpiresAt = idempotencyExpiresAt;
   }
 
   public LocalDateTime getCreatedAt() {
