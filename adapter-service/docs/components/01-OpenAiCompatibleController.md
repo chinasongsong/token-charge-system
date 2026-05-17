@@ -5,7 +5,7 @@
 | 类 | `com.tokenhub.adapter.presentation.OpenAiCompatibleController` |
 | 层 | **presentation** |
 | 端口 | 由 `server.port` 决定，默认 **8102** |
-| 关联 | `ChatCompletionApplicationService`、`BillingSettlementClient` |
+| 关联 | `IdempotentChatCompletionApplicationService`、`ChatCompletionApplicationService` |
 
 ---
 
@@ -17,7 +17,7 @@ OpenAI 生态的工具链（SDK、CLI、第三方网关）普遍约定 **`/v1/ch
 
 ## 2. 作用
 
-1. **`POST /v1/chat/completions`**：接收 OpenAI 风格请求体（`JsonNode`），调用应用服务转发上游，返回上游 JSON；响应返回前触发 **最佳努力** 计费结算。
+1. **`POST /v1/chat/completions`**：经 `IdempotentChatCompletionApplicationService` 编排——有复合幂等键时先查 Redis 缓存；未命中则调上游、`settle` 成功后写缓存（见 [07-ChatIdempotencyResponseCache.md](./07-ChatIdempotencyResponseCache.md)）。
 2. **`GET /v1/models`**：返回合并后的模型列表（由 `@Primary` 的 `FailoverRoutingAdapter.listModels()` 聚合）。
 
 ---
@@ -35,23 +35,17 @@ OpenAI 生态的工具链（SDK、CLI、第三方网关）普遍约定 **`/v1/ch
 
 ## 4. 实现要点
 
-```27:37:adapter-service/src/main/java/com/tokenhub/adapter/presentation/OpenAiCompatibleController.java
+```27:31:adapter-service/src/main/java/com/tokenhub/adapter/presentation/OpenAiCompatibleController.java
   @PostMapping(value = "/v1/chat/completions", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
   public JsonNode chatCompletions(@RequestBody JsonNode body, HttpServletRequest request) {
-    JsonNode response = chatCompletionApplicationService.chat(body);
-    billingSettlementClient.trySettle(request, body, response);
-    return response;
-  }
-
-  @GetMapping(value = "/v1/models", produces = MediaType.APPLICATION_JSON_VALUE)
-  public JsonNode listModels() {
-    return chatCompletionApplicationService.models();
+    return idempotentChatCompletionApplicationService.complete(body, request);
   }
 ```
 
-**顺序语义**：
+**顺序语义**（有幂等缓存时）：
 
-- 先完成上游调用并拿到 `response`，再 `trySettle`——结算失败**不会**改变已返回给客户端的 HTTP 200 与 body（除非上游本身报错）。
+- 缓存命中：直接返回，**不调上游、不调 billing**。
+- 未命中：上游 `chat` → `trySettle`（2xx 才写缓存）→ 返回 body。
 - `HttpServletRequest` 仅用于读取网关注入头，不用于解析 API Key。
 
 ---

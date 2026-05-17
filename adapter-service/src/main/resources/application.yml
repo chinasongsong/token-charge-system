@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: adapter-service
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
   datasource:
     url: ${MYSQL_JDBC_URL:jdbc:mysql://127.0.0.1:3306/token_charge?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${MYSQL_USERNAME:root}
@@ -29,6 +33,11 @@ tokenhub:
     routing:
       weight-deepseek: ${ROUTING_WEIGHT_DEEPSEEK:70}
       weight-zhipu: ${ROUTING_WEIGHT_ZHIPU:30}
+    idempotency-cache:
+      enabled: ${ADAPTER_IDEMPOTENCY_CACHE_ENABLED:true}
+      ttl-seconds: ${ADAPTER_IDEMPOTENCY_CACHE_TTL:86400}
+      lock-ttl-seconds: ${ADAPTER_IDEMPOTENCY_LOCK_TTL:120}
+      wait-ms: ${ADAPTER_IDEMPOTENCY_WAIT_MS:30000}
   billing:
     settlement-enabled: ${BILLING_SETTLEMENT_ENABLED:true}
     base-url: ${TOKENS_GATEWAY_BILLING_URI:http://127.0.0.1:8103}

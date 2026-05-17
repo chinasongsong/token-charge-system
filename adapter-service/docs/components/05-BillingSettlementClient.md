@@ -4,7 +4,7 @@
 |----|------|
 | 类 | `com.tokenhub.adapter.infrastructure.billing.BillingSettlementClient` |
 | 层 | **infrastructure** |
-| 调用时机 | `OpenAiCompatibleController` 在 Chat **成功返回后** |
+| 调用时机 | `IdempotentChatCompletionApplicationService` 在 Chat **成功返回后**（缓存命中则跳过） |
 | 下游 | `POST {billingBaseUrl}/internal/billing/settle` |
 
 ---
@@ -21,6 +21,7 @@
 2. 从 **响应 JSON** 读取 `usage.prompt_tokens` / `usage.completion_tokens`。
 3. 组装结算体并 `POST` billing 内部接口，请求头带 `X-Internal-Token`。
 4. 任一步不满足或 HTTP 失败 → **静默跳过或 warn**，不影响已返回给客户端的 Chat 响应。
+5. `trySettle` 返回 `boolean`：HTTP 2xx 为 `true`，供 [07-ChatIdempotencyResponseCache.md](./07-ChatIdempotencyResponseCache.md) 判定是否写入响应缓存。
 
 ---
 

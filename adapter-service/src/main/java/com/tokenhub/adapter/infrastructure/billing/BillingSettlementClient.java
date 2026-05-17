@@ -46,23 +46,30 @@ public class BillingSettlementClient {
     this.restTemplate = restTemplate;
   }
 
-  public void trySettle(HttpServletRequest request, JsonNode chatRequest, JsonNode chatResponse) {
+  public boolean isSettlementEnabled() {
+    return settlementEnabled;
+  }
+
+  /**
+   * @return {@code true} 表示已调用 billing 且 HTTP 2xx；未调用或失败为 {@code false}
+   */
+  public boolean trySettle(HttpServletRequest request, JsonNode chatRequest, JsonNode chatResponse) {
     if (!settlementEnabled || chatResponse == null || !chatResponse.isObject()) {
-      return;
+      return false;
     }
     String userIdHeader = request.getHeader(HEADER_USER_ID);
     if (userIdHeader == null || userIdHeader.isBlank()) {
-      return;
+      return false;
     }
     String traceId = request.getHeader(HEADER_TRACE_ID);
     if (traceId == null || traceId.isBlank()) {
-      return;
+      return false;
     }
     long userId;
     try {
       userId = Long.parseLong(userIdHeader.trim());
     } catch (NumberFormatException ex) {
-      return;
+      return false;
     }
     Long apiKeyId = null;
     String ak = request.getHeader(HEADER_API_KEY_ID);
@@ -70,7 +77,7 @@ public class BillingSettlementClient {
       try {
         apiKeyId = Long.parseLong(ak.trim());
       } catch (NumberFormatException ignored) {
-        return;
+        return false;
       }
     }
 
@@ -82,7 +89,7 @@ public class BillingSettlementClient {
       outputTokens = u.path("completion_tokens").asLong(0);
     }
     if (inputTokens == 0 && outputTokens == 0) {
-      return;
+      return false;
     }
 
     String modelName = chatRequest.path("model").asText(null);
@@ -114,9 +121,11 @@ public class BillingSettlementClient {
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.set("X-Internal-Token", internalToken);
     try {
-      restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Void.class);
+      var response = restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Void.class);
+      return response.getStatusCode().is2xxSuccessful();
     } catch (Exception ex) {
       log.warn("billing settle failed: {}", ex.toString());
+      return false;
     }
   }
 
