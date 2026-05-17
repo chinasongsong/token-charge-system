@@ -15,12 +15,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * 网关注入 {@code X-User-Id} / {@code X-Api-Key-Id} / {@code X-Trace-Id} 后，将上游返回的 usage 记账到 billing。
+ * 网关注入用户/幂等/trace 头后，将上游 usage 记账到 billing。
  */
 @Component
 public class BillingSettlementClient {
 
   private static final Logger log = LoggerFactory.getLogger(BillingSettlementClient.class);
+
+  public static final String HEADER_USER_ID = "X-User-Id";
+  public static final String HEADER_API_KEY_ID = "X-Api-Key-Id";
+  public static final String HEADER_TRACE_ID = "X-Trace-Id";
+  public static final String HEADER_IDEMPOTENCY_COMPOSITE = "X-Idempotency-Key-Composite";
+  public static final String HEADER_IDEMPOTENCY_SOURCE = "X-Idempotency-Source";
 
   private final RestTemplate restTemplate;
 
@@ -44,11 +50,11 @@ public class BillingSettlementClient {
     if (!settlementEnabled || chatResponse == null || !chatResponse.isObject()) {
       return;
     }
-    String userIdHeader = request.getHeader("X-User-Id");
+    String userIdHeader = request.getHeader(HEADER_USER_ID);
     if (userIdHeader == null || userIdHeader.isBlank()) {
       return;
     }
-    String traceId = request.getHeader("X-Trace-Id");
+    String traceId = request.getHeader(HEADER_TRACE_ID);
     if (traceId == null || traceId.isBlank()) {
       return;
     }
@@ -59,7 +65,7 @@ public class BillingSettlementClient {
       return;
     }
     Long apiKeyId = null;
-    String ak = request.getHeader("X-Api-Key-Id");
+    String ak = request.getHeader(HEADER_API_KEY_ID);
     if (ak != null && !ak.isBlank()) {
       try {
         apiKeyId = Long.parseLong(ak.trim());
@@ -84,16 +90,25 @@ public class BillingSettlementClient {
       modelName = "deepseek-v4-flash";
     }
 
+    String idempotencyKey = request.getHeader(HEADER_IDEMPOTENCY_COMPOSITE);
+    String idempotencySource = request.getHeader(HEADER_IDEMPOTENCY_SOURCE);
+
     String base = trimTrailingSlash(billingBaseUrl);
     String url = base + "/internal/billing/settle";
     Map<String, Object> body = new LinkedHashMap<>();
-    body.put("traceId", traceId);
+    body.put("traceId", traceId.trim());
     body.put("userId", userId);
     body.put("apiKeyId", apiKeyId);
     body.put("providerCode", resolveProviderForModel(modelName));
     body.put("modelName", modelName);
     body.put("inputTokens", inputTokens);
     body.put("outputTokens", outputTokens);
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      body.put("idempotencyKey", idempotencyKey.trim());
+    }
+    if (idempotencySource != null && !idempotencySource.isBlank()) {
+      body.put("idempotencySource", idempotencySource.trim());
+    }
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
@@ -105,7 +120,6 @@ public class BillingSettlementClient {
     }
   }
 
-  /** 故障转移到智谱时请求体中的 model 多为 glm-*，按名称推断 provider 以便计价命中 model_prices。 */
   private String resolveProviderForModel(String modelName) {
     if (modelName == null || modelName.isBlank()) {
       return providerCode;

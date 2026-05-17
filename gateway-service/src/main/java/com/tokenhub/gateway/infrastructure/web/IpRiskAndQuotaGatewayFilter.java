@@ -153,7 +153,7 @@ public class IpRiskAndQuotaGatewayFilter implements GlobalFilter, Ordered {
 
   @Override
   public int getOrder() {
-    // 解析 API Key 后（+11）、限流（+13）之前
-    return Ordered.HIGHEST_PRECEDENCE + 12;
+    // 幂等键（+12）之后、秒级限流（+14）之前
+    return Ordered.HIGHEST_PRECEDENCE + 13;
   }
 }

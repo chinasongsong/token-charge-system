@@ -19,9 +19,12 @@
 ## 2. 作用
 
 1. 读取请求头 `X-Trace-Id`；为空则生成 `UUID`。
-2. 写回**变异后的请求**（下游可见同一 ID）。
-3. 存入 `exchange` 属性 `gateway.traceId`（`TRACE_ATTR`），供其他过滤器写错误 JSON。
-4. 在响应提交前（`beforeCommit`）设置响应头 `X-Trace-Id`。
+2. 若客户端传入非空头，**长度不得超过 128**（超长返回 `400` / `I400002`）。
+3. 写回**变异后的请求**（下游可见同一 ID）。
+4. 存入 `exchange` 属性 `gateway.traceId`（`TRACE_ATTR`），供其他过滤器写错误 JSON。
+5. 在响应提交前（`beforeCommit`）设置响应头 `X-Trace-Id`。
+
+> **与扣费幂等（O-10）**：Chat 结算幂等请使用 `X-Idempotency-Key`，见 [08-IdempotencyGatewayFilter.md](./08-IdempotencyGatewayFilter.md)。`X-Trace-Id` 主要用于观测与 `request_orders.trace_id` 字段。
 
 ---
 
@@ -64,7 +67,7 @@
 | 优点 | 缺点 |
 |------|------|
 | 实现极简、零外部依赖 | 未对接 OpenTelemetry / W3C `traceparent` 标准 |
-| 客户端可自带 ID 便于联调 | 未校验 ID 格式，恶意超长头可能影响日志 |
+| 客户端可自带 ID 便于联调 | 仅校验最大长度，不校验 UUID 格式；与 OTel 未对齐 |
 | `beforeCommit` 保证响应头一致 | 未自动注入 SLF4J MDC（需 Logback 配置或后续过滤器） |
 
 ---
@@ -90,6 +93,7 @@
 
 ## 8. 相关文档
 
+- [08-IdempotencyGatewayFilter.md](./08-IdempotencyGatewayFilter.md)（Chat 扣费幂等，O-10）
 - [09-错误响应与头约定.md](../09-错误响应与头约定.md)
 - [00-网关总览.md](../00-网关总览.md)
 
@@ -150,11 +154,14 @@
 
 **（2）与业务幂等的关系**
 
-本仓库里 `traceId` 还用于 billing 结算、预占等的**幂等键**（例如 `SettlementCommand.traceId`、`BalanceReservation`）。  
+- **Chat 按量结算（O-10）**：优先使用客户端 `X-Idempotency-Key`（UUID v4），网关合成 `X-Idempotency-Key-Composite` 作为 `request_orders.idempotency_key`；未提供时回退 `userId:apiKeyId:traceId`（`TRACE_ID_FALLBACK`）。
+- **`X-Trace-Id`**：仍写入订单 `trace_id` 列并用于日志；**不应**再单独依赖 traceId 防重试重复扣费。
+- **预占 `reserve`（O-3）**：内部 API 仍以 `trace_id` 为幂等键（与 Trace 对齐）。
+
 因此：
 
-- **同一次业务**应在客户端或首跳固定 `X-Trace-Id`，重试时继续带上，避免被当成新请求。
-- 这与「网关是否分布式」无关，与「ID 是否在重试间保持一致」有关。
+- **同一次 Chat 重试**应固定 `X-Idempotency-Key`；`X-Trace-Id` 可固定或每次新建（以复合幂等键为准）。
+- 这与「网关是否分布式」无关，与「幂等键是否在重试间保持一致」有关。
 
 **（3）下游 MVC 服务**
 
@@ -180,43 +187,33 @@
 
 
 ## 10、如果traceid重试的时候换了会怎么样？
+
 追踪 `traceId` 在扣费、预占、入账等路径中的用法，评估重试换新 ID 的影响。
 
+**重试时若网关生成新的 TraceId，且未固定 `X-Idempotency-Key`，等价于一次新的业务请求**——扣费幂等键对不上，无法把重试当成「同一次调用」。下面按你仓库里的真实链路说明影响。
 
-[11 tools called]
+## TraceId 在扣费里扮演什么（2026-05 起与 O-10 并存）
 
-**重试时若网关生成新的 TraceId，等价于一次新的业务请求**——扣费幂等键对不上，无法把重试当成「同一次调用」。下面按你仓库里的真实链路说明影响。
+adapter 结算请求体始终带 **`traceId`**（来自 `X-Trace-Id`）。**扣费幂等键**为 `idempotencyKey`（网关注入的 `X-Idempotency-Key-Composite`）；若为空则 billing **回退** `traceId`。
 
-## TraceId 在扣费里扮演什么
-
-在本项目中，`X-Trace-Id` 进入 adapter 后，会作为 **结算幂等键** 传给 billing：
-
-```90:90:adapter-service/src/main/java/com/tokenhub/adapter/infrastructure/billing/BillingSettlementClient.java
+```90:96:adapter-service/src/main/java/com/tokenhub/adapter/infrastructure/billing/BillingSettlementClient.java
     body.put("traceId", traceId);
+    // 另有 idempotencyKey / idempotencySource（来自网关头）
 ```
 
-`BillingSettlementApplicationService.settle` 用 **`traceId` = `request_orders.idempotency_key`**：
+`BillingSettlementApplicationService.settle` 使用 **`effectiveIdempotencyKey`**（优先 `idempotencyKey`，否则 `traceId`）：
 
-```60:82:billing-service/src/main/java/com/tokenhub/billing/application/BillingSettlementApplicationService.java
+```71:76:billing-service/src/main/java/com/tokenhub/billing/application/BillingSettlementApplicationService.java
     RequestOrderPo done = requestOrderMapper.selectOne(
         new LambdaQueryWrapper<RequestOrderPo>()
-            .eq(RequestOrderPo::getIdempotencyKey, cmd.traceId())
+            .eq(RequestOrderPo::getIdempotencyKey, effectiveIdempotencyKey)
     );
     if (done != null && "COMPLETED".equals(done.getBillingStatus())) {
-      return;  // 已成功结算过，直接返回，不再扣款
+      return;
     }
-    ...
-    pending.setIdempotencyKey(cmd.traceId());
-    try {
-      requestOrderMapper.insert(pending);
-    } catch (DuplicateKeyException ex) {
-      return;  // 已有同 traceId 的订单行，直接返回（不再 debit）
-    }
-    ...
-    accountBalanceApplicationService.debit(cmd.userId(), amount);
 ```
 
-因此：**只有「同一条 `traceId`」的重复结算请求，才会被当成幂等**。
+因此：**只有「同一条 `effectiveIdempotencyKey`」的重复结算请求，才会被当成幂等**（优先客户端 `X-Idempotency-Key` 合成的复合键）。
 
 ---
 
@@ -227,7 +224,7 @@
 | 环节 | 是否用 traceId 幂等 | 换新 ID 的影响 |
 |------|---------------------|----------------|
 | **模型调用**（adapter → 供应商） | 否 | 可能再调一次模型，供应商侧多一笔用量 |
-| **按量扣费 settle** | **是**（`idempotency_key = traceId`） | **会再扣一笔**，与第一次互不相认 |
+| **按量扣费 settle** | **是**（无 `X-Idempotency-Key` 时回退 traceId） | **会再扣一笔**，与第一次互不相认 |
 | **网关余额预检** | 否（只传 `userId`） | 每次重试再查一次余额，不防重复扣费 |
 | **秒级限流 / 日配额** | 否（按 apiKey/user + 时间桶） | 每次重试仍占配额 |
 | **充值入账**（payment） | 否（用 `orderNo` 作 `sourceRef`） | 与 TraceId 无关 |
@@ -291,16 +288,16 @@ adapter 里是 **「一次 HTTP = 一次 chat + 一次 trySettle」**：
 
 ---
 
-## 对你业务的实际建议（不改代码层面的原则）
+## 对你业务的实际建议
 
-1. **客户端 / SDK 重试时必须复用同一个 `X-Trace-Id`**（或业务层自己生成 Idempotency-Key 并映射到头里），不要依赖网关每次新生成。
-2. 把 TraceId 同时用于：**日志关联 + 结算幂等**；若需要与 OpenAI 的 request id 对齐，可在客户端生成 UUID 写入 `X-Trace-Id`。
-3. 长期可考虑：**幂等键与 Trace 解耦**（例如 `Idempotency-Key` 由客户端按「一次用户操作」固定，Trace 仅观测）；或 adapter 在 body 里支持 OpenAI 式字段（若未来有）。
-4. 注意：**预检、限流不用 traceId**，换新 ID 不能防止「重复请求多扣配额」，只能解决「结算幂等」这一层。
+1. **客户端 / SDK 重试 Chat 时必须复用同一个 `X-Idempotency-Key`（UUID v4）**；不要依赖网关每次新生成 `X-Trace-Id` 防重复扣费。
+2. **`X-Trace-Id`** 用于日志与排障；可与幂等键相同，也可独立生成。
+3. 未传 `X-Idempotency-Key` 时网关使用 `TRACE_ID_FALLBACK`（复合键含 traceId）——重试换新 traceId 仍有重复扣费风险。
+4. 注意：**预检、限流不用 traceId/幂等键**，换新 ID 不能防止「重复请求多扣配额」。
 
 ---
 
 ## 一句话总结
 
-**重试导致新 TraceId → billing 的 `settle` 会认为是另一笔请求 → 在每次重试都完整走完「模型 + 有 usage 的响应」时，存在重复扣费风险。**  
-幂等只保护「相同 traceId 的重复结算」，不保护「同一次用户操作、不同 traceId 的多次 HTTP」。充值路径用 `orderNo`，不受网关 TraceId 影响。
+**重试导致新 TraceId，且未固定 `X-Idempotency-Key` → billing 的 `settle` 会认为是另一笔请求 → 在每次重试都完整走完「模型 + 有 usage 的响应」时，存在重复扣费风险。**  
+幂等保护「相同 `idempotency_key`（优先客户端幂等键）的重复结算」。充值路径用 `orderNo`，不受网关 TraceId 影响。

@@ -115,7 +115,7 @@ public class BillingSettlementApplicationService {
     ledger.setRequestOrderId(pending.getId());
     ledger.setEntryType("USAGE");
     ledger.setQuantity(amount);
-    ledger.setIdempotencyKey(cmd.traceId());
+    ledger.setIdempotencyKey(effectiveIdempotencyKey);
     Map<String, Object> detail = new HashMap<>();
     detail.put("providerCode", cmd.providerCode());
     detail.put("modelName", cmd.modelName());
@@ -142,7 +142,7 @@ public class BillingSettlementApplicationService {
     event.put("requestOrderId", pending.getId());
     settlementOutboxWriter.append(
         "request_order",
-        cmd.traceId(),
+        effectiveIdempotencyKey,
         "billing.settled",
         event
     );

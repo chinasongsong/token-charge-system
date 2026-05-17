@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |----|------|
 | 类 | `com.tokenhub.gateway.infrastructure.web.ApiKeyRedisRateLimitGatewayFilter` |
-| Order | `HIGHEST_PRECEDENCE + 13` |
+| Order | `HIGHEST_PRECEDENCE + 14` |
 
 ---
 

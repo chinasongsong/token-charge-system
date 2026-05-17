@@ -11,13 +11,13 @@
 
 ## 1. 背景
 
-网关已在边缘完成鉴权与（Chat 路径）余额 **预检**，但实际 token 消耗只有在上游响应返回后才可知。adapter 在拿到 OpenAI 兼容响应中的 `usage` 字段后，将用量 **异步最佳努力** 提交给 billing，由 billing 按 `traceId` 幂等入账。
+网关已在边缘完成鉴权与（Chat 路径）余额 **预检**，但实际 token 消耗只有在上游响应返回后才可知。adapter 在拿到 OpenAI 兼容响应中的 `usage` 字段后，将用量 **异步最佳努力** 提交给 billing。扣费幂等以网关注入的 **`idempotencyKey`（复合键）** 为准；`traceId` 用于观测与订单 `trace_id` 字段（无复合键时 billing 回退 `traceId`）。
 
 ---
 
 ## 2. 作用
 
-1. 从 **网关注入头** 读取 `X-User-Id`、`X-Api-Key-Id`、`X-Trace-Id`。
+1. 从 **网关注入头** 读取 `X-User-Id`、`X-Api-Key-Id`、`X-Trace-Id`、`X-Idempotency-Key-Composite`、`X-Idempotency-Source`（后两者可选，Chat 经网关时应有）。
 2. 从 **响应 JSON** 读取 `usage.prompt_tokens` / `usage.completion_tokens`。
 3. 组装结算体并 `POST` billing 内部接口，请求头带 `X-Internal-Token`。
 4. 任一步不满足或 HTTP 失败 → **静默跳过或 warn**，不影响已返回给客户端的 Chat 响应。
@@ -56,6 +56,8 @@
 | 字段 | 来源 |
 |------|------|
 | `traceId` | `X-Trace-Id` |
+| `idempotencyKey` | `X-Idempotency-Key-Composite`（可选） |
+| `idempotencySource` | `X-Idempotency-Source`（可选） |
 | `userId` | `X-User-Id` |
 | `apiKeyId` | `X-Api-Key-Id`（可 null） |
 | `providerCode` | `resolveProviderForModel(modelName)` |
@@ -130,7 +132,7 @@
 | 优点 | 缺点 |
 |------|------|
 | 不阻断用户响应 | 结算失败仅 warn，需监控 |
-| 与网关 trace 幂等对齐 | 无 usage 的上游响应无法计费 |
+| 与网关 O-10 幂等键对齐 | 无 usage 的上游响应无法计费 |
 | model 启发式区分供应商 | 新模型命名规则需维护 |
 
 ---
@@ -140,4 +142,5 @@
 - [components/01-OpenAiCompatibleController.md](./01-OpenAiCompatibleController.md)
 - [00-模块总览.md](../00-模块总览.md)
 - [gateway-service/docs/filters/07-BillingPreflightGatewayFilter.md](../../../gateway-service/docs/filters/07-BillingPreflightGatewayFilter.md)
+- [gateway-service/docs/filters/08-IdempotencyGatewayFilter.md](../../../gateway-service/docs/filters/08-IdempotencyGatewayFilter.md)
 - `docs/TDD/O-01-扣费并发-分布式锁与悲观锁策略.md`（billing 侧幂等）
