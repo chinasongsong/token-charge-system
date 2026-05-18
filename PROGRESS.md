@@ -104,6 +104,7 @@
 ### 遗留 / 下一阶段的输入
 
 - **日配额限流**、更精细的预扣款 / 流式中途截断计费等：可在 **P4/P6** 与运营策略一并演进。
+- **O-10**（客户端幂等键 + Chat 响应缓存）见下文 **P-Opt / O-10**；生产应强制 SDK 固定 `X-Idempotency-Key`，勿依赖 `TRACE_ID_FALLBACK`。
 
 ---
 
@@ -225,9 +226,9 @@
 
 ---
 
-## P-Opt 待优化点（O-1～O-9）M1 骨架交付
+## P-Opt 待优化点（O-1～O-10）
 
-**完成状态**：开发中（每项 M1 骨架已合入主分支；M2/M3 待 P7/P8 联动）
+**完成状态**：开发中（O-1～O-9 为 M1 骨架；**O-10 幂等链路已落地**；其余 M2/M3 待 P7/P8 联动）
 
 ### 本阶段做了什么
 
@@ -242,6 +243,12 @@
 - **O-7 API Key 生命周期**：`api_keys` 新增 `expires_at` / `last_used_at` 与索引；解析路径加「未过期」校验；`ApiKeyExpirationScheduler` 定时将到期 ACTIVE 翻转 EXPIRED；`create(...)` 支持可选 `ttlDays`，旧入口默认 null 保持兼容。
 - **O-8 支付补偿**：新增 `ChannelQueryPort` 端口与 `MockChannelQueryPort` 默认实现；`ChannelReconcileApplicationService` 在「本地 INIT + 渠道 PAID + 金额一致」三重校验后持订单短锁触发 `completePendingFromCallback`，UNKNOWN/UNPAID/AMOUNT_MISMATCH 一律拒绝；`/internal/payments/orders/{orderNo}/channel-reconcile` 端点；与 `/retry-credit` 共享锁与 billing sourceRef 入账幂等。
 - **O-9 读扩展**：`common-mybatis` 新增 `@ReadOnly` 注解、`RoutingContext`（嵌套 ThreadLocal Deque）、`ReadOnlyRoutingAspect`（Order 高于事务）、`DynamicRoutingDataSource`（未配 reader 时回 writer）、`DataSourceRoutingConfiguration`（`tokenhub.routing.enabled=true` 启用）；pom 引入 `starter-aop / starter-jdbc`。
+- **O-10 客户端幂等 + Chat 响应缓存（用户侧不重复扣费 + 平台侧不重复调上游）**：
+  - **职责拆分**：`X-Trace-Id` 仅观测/订单 `trace_id`；结算与缓存以 **`X-Idempotency-Key-Composite`** 为准（网关合成 `userId:apiKeyId:clientKey` 或 trace 回退）。
+  - **`gateway-service`**：`IdempotencyGatewayFilter`（Order +12，仅 `POST /v1/chat/completions`）；校验客户端 `X-Idempotency-Key`（UUID v4，非法 `400/I400001`）；注入 `X-Idempotency-Key-Composite`、`X-Idempotency-Source`（`CLIENT` | `TRACE_ID_FALLBACK`）；JWT 无 API Key 时 `apiKeyId=0`。`TraceGatewayFilter` 对超长 traceId 返回 `400/I400002`。
+  - **`billing-service`**：`SettlementRequest` / `InternalBillingController` 接收 `idempotencyKey`、`idempotencySource`；`BillingSettlementApplicationService` 以 `effectiveIdempotencyKey`（有复合键用之，否则 `traceId`）写 `request_orders` / `usage_ledger` 与 Outbox，已完成订单直接返回（不重复扣费）。
+  - **`adapter-service`**：`IdempotentChatCompletionApplicationService` + **`RedisChatIdempotencyResponseCache`**：有复合键时先查 Redis `adapter:chat:idem:resp:{composite}`，命中则**不调上游、不调 settle**；未命中持 `lock:{composite}` → `chat` → `trySettle`（HTTP 2xx 或关闭结算）后写缓存（默认 TTL 24h）；并发同键轮询等待或 `409/I409001`。`spring-boot-starter-data-redis` + `tokenhub.adapter.idempotency-cache.*`。
+  - **文档**：`gateway-service/docs/filters/08-IdempotencyGatewayFilter.md`、`adapter-service/docs/components/07-ChatIdempotencyResponseCache.md` 等（增量补丁，保留 `01-Trace` 用户章节）。
 
 ### 关键交付物（路径）
 
@@ -251,14 +258,25 @@
 - payment：`application/{ChannelQueryPort,ChannelReconcileApplicationService,ChannelReconciliationApplicationService}.java`、`infrastructure/channel/MockChannelQueryPort.java`、`infrastructure/persistence/ChannelReconciliation*.java`、`presentation/{InternalPaymentController,InternalReconciliationController}.java`
 - 公共：`common/common-mybatis/src/.../routing/{ReadOnly,RoutingContext,ReadOnlyRoutingAspect,DynamicRoutingDataSource,DataSourceRoutingConfiguration}.java`
 - 文档：`docs/architecture/技术负债与路线图.md`、`docs/TDD/O-01.md…O-09.md` 第 18 节「实现对照」
+- **O-10 幂等（网关 + 计费 + 适配器 + 文档）**：
+  - gateway：`infrastructure/web/{IdempotencyGatewayFilter,TraceGatewayFilter,GatewayIngressHeaders}.java`、`docs/filters/{08-IdempotencyGatewayFilter,01-TraceGatewayFilter}.md`
+  - billing：`presentation/dto/SettlementRequest.java`、`presentation/InternalBillingController.java`、`application/BillingSettlementApplicationService.java`、`docs/components/05-BillingSettlementApplicationService.md`
+  - adapter：`application/IdempotentChatCompletionApplicationService.java`、`infrastructure/cache/{RedisChatIdempotencyResponseCache,ChatIdempotencyCacheProperties}.java`、`infrastructure/billing/BillingSettlementClient.java`、`presentation/OpenAiCompatibleController.java`、`src/main/resources/application.yml`（Redis + `tokenhub.adapter.idempotency-cache`）、`pom.xml`（`spring-boot-starter-data-redis`）、`docs/components/{07-ChatIdempotencyResponseCache,01-OpenAiCompatibleController,05-BillingSettlementClient}.md`
+  - 设计：`docs/TDD/O-10-客户端幂等键设计.md`
 
 ### 验收与检查
 
-- `mvn -q -DskipTests compile`（全 reactor 编译通过）；
+- `mvn -q -DskipTests compile`（全 reactor 编译通过）；**O-10** 至少 `mvn -pl gateway-service,billing-service,adapter-service -am compile`；
 - `python scripts/check_boundaries.py`（无新增越层）；`python scripts/gc_scan.py`（关键文档齐全）；
-- 9 项 O-x 默认 **开关关闭**，开启后不可逆数据写入仅限新建表与新增列，**不破坏现有路径**。
+- O-1～O-9 默认 **开关关闭**，开启后不可逆数据写入仅限新建表与新增列，**不破坏现有路径**。
+- **O-10 联调（需 Redis + 三服务 + 网关）**：
+  1. 固定 `X-Idempotency-Key`（UUID v4）与同一 Chat body，连续两次 `POST /v1/chat/completions`（经 8080）：第二次应**更快返回相同 JSON**，且 `request_orders` **仅一条**（`idempotency_key` = 复合键）；上游日志/用量不应出现第二次完整推理（adapter 缓存命中）。
+  2. 非法幂等键（非 UUID v4）→ 网关 `400` / `I400001`，不进 adapter。
+  3. 并发同键：第二请求在 in-flight 内应轮询等待或 `409` / `I409001`（见 `07-ChatIdempotencyResponseCache.md`）。
+  4. 无 `X-Idempotency-Key` 且每次换新 `X-Trace-Id`：仍可能重复扣费（`TRACE_ID_FALLBACK`），仅作兼容，**不作为生产验收项**。
 
 ### 遗留 / 下一阶段的输入
 
+- **O-10 后续**：生产强制要求客户端 `X-Idempotency-Key`（网关配置或 SDK 契约）；SSE 流式路径的幂等与缓存策略；可选「同 Key 不同 body 返回 409」与 body 哈希绑定（当前为「同 Key 返回首次成功响应」）；缓存指标与 Redis 故障降级观测。
 - **M2/M3 收口**：O-1 Redisson 看门狗续期与压测对照；O-2 RabbitMQ Publisher 与消费者 + DLQ；O-3 网关 `ReserveFilter` 与 SSE 尾包 commit；O-4 大文件流式解析与 ops 调账审批；O-5 即时 invalidation（PUBLISH/DEL）与余额只读缓存（仅展示）；O-6 ops-console DB 配置 IP 规则与差异化配额；O-7 控制台展示与轮换 UX；O-8 微信/支付宝官方查单 + `PaymentCompensationScheduler` 与 O-4 联动；O-9 业务接口实际标注 `@ReadOnly` + 副本健康度熔断。
-- 详细勾选仍以 [`docs/dev-plan.md`](docs/dev-plan.md) §2.3 为准。
+- 详细勾选仍以 [`docs/dev-plan.md`](docs/dev-plan.md) §2.3 为准；**O-10** 实现对照见 [`docs/TDD/O-10-客户端幂等键设计.md`](docs/TDD/O-10-客户端幂等键设计.md)。
