@@ -14,7 +14,7 @@
 
 模型调用完成后，`adapter-service` 携带 `traceId`、token 用量回调 billing **按量结算**：写 `request_orders`、扣余额、记 `usage_ledger`，并同事务追加 **Outbox** 事件供异步下游消费（O-2）。
 
-幂等键 = **`traceId`**（与网关 Trace、预占 O-3 对齐）。已 `COMPLETED` 的订单直接返回。
+结算幂等键 = **`idempotencyKey`**（网关复合键 `userId:apiKeyId:clientKey`）；缺省时回退 **`traceId`**（`TRACE_ID_FALLBACK`）。订单 `trace_id` 列仍存观测用 traceId。预占 O-3 的 `reserve` 仍以 `trace_id` 为幂等键。已 `COMPLETED` 的订单直接返回。
 
 ---
 
@@ -45,17 +45,18 @@ sequenceDiagram
 
 ## 3. BillingSettlementApplicationService#settle
 
-**命令对象 `SettlementCommand`：** `traceId`, `userId`, `apiKeyId`, `providerCode`, `modelName`, `inputTokens`, `outputTokens`。
+**命令对象 `SettlementCommand`：** `traceId`, `userId`, `apiKeyId`, `providerCode`, `modelName`, `inputTokens`, `outputTokens`, `idempotencyKey`, `idempotencySource`。
 
 **步骤（单事务 `@Transactional`）：**
 
-1. 若已有同 `idempotencyKey(=traceId)` 且 `billing_status=COMPLETED` → 返回。
-2. 插入 `request_orders`（`PENDING`）；`DuplicateKeyException` → 返回（并发幂等）。
-3. `PricingService.computeChargeMicro(...)` 计价。
-4. `accountBalanceApplicationService.debit`。
-5. 更新订单 `COMPLETED` + `amount`。
-6. 插入 `usage_ledger`（`ENTRY_TYPE=USAGE`）。
-7. `settlementOutboxWriter.append("request_order", traceId, "billing.settled", event)`。
+1. `effectiveIdempotencyKey` = 非空 `idempotencyKey` 否则 `traceId`。
+2. 若已有同 `effectiveIdempotencyKey` 且 `billing_status=COMPLETED` → 返回。
+3. 插入 `request_orders`（`PENDING`）；`DuplicateKeyException` → 返回（并发幂等）。
+4. `PricingService.computeChargeMicro(...)` 计价。
+5. `accountBalanceApplicationService.debit`。
+6. 更新订单 `COMPLETED` + `amount`。
+7. 插入 `usage_ledger`（`idempotency_key` 与订单一致）。
+8. `settlementOutboxWriter.append("request_order", effectiveIdempotencyKey, "billing.settled", event)`。
 
 ```55:132:billing-service/src/main/java/com/tokenhub/billing/application/BillingSettlementApplicationService.java
   @Transactional
@@ -127,7 +128,7 @@ sequenceDiagram
 
 | 机制 | 防什么 |
 |------|--------|
-| `traceId` / `idempotency_key` | 重复结算 |
+| `idempotency_key`（优先 O-10 复合键，回退 traceId） | 重复结算 |
 | `account_balance.version` 乐观锁 | 并发写余额丢更新 |
 | `BalanceLock`（可选） | 热点用户重试风暴、读-算-写窗口 |
 

@@ -65,7 +65,9 @@ public class InternalBillingController {
             request.providerCode(),
             request.modelName(),
             request.inputTokens(),
-            request.outputTokens()
+            request.outputTokens(),
+            request.idempotencyKey(),
+            request.idempotencySource()
         )
     );
   }

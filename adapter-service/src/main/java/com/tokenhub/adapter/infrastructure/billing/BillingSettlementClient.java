@@ -15,12 +15,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * 网关注入 {@code X-User-Id} / {@code X-Api-Key-Id} / {@code X-Trace-Id} 后，将上游返回的 usage 记账到 billing。
+ * 网关注入用户/幂等/trace 头后，将上游 usage 记账到 billing。
  */
 @Component
 public class BillingSettlementClient {
 
   private static final Logger log = LoggerFactory.getLogger(BillingSettlementClient.class);
+
+  public static final String HEADER_USER_ID = "X-User-Id";
+  public static final String HEADER_API_KEY_ID = "X-Api-Key-Id";
+  public static final String HEADER_TRACE_ID = "X-Trace-Id";
+  public static final String HEADER_IDEMPOTENCY_COMPOSITE = "X-Idempotency-Key-Composite";
+  public static final String HEADER_IDEMPOTENCY_SOURCE = "X-Idempotency-Source";
 
   private final RestTemplate restTemplate;
 
@@ -40,31 +46,38 @@ public class BillingSettlementClient {
     this.restTemplate = restTemplate;
   }
 
-  public void trySettle(HttpServletRequest request, JsonNode chatRequest, JsonNode chatResponse) {
+  public boolean isSettlementEnabled() {
+    return settlementEnabled;
+  }
+
+  /**
+   * @return {@code true} 表示已调用 billing 且 HTTP 2xx；未调用或失败为 {@code false}
+   */
+  public boolean trySettle(HttpServletRequest request, JsonNode chatRequest, JsonNode chatResponse) {
     if (!settlementEnabled || chatResponse == null || !chatResponse.isObject()) {
-      return;
+      return false;
     }
-    String userIdHeader = request.getHeader("X-User-Id");
+    String userIdHeader = request.getHeader(HEADER_USER_ID);
     if (userIdHeader == null || userIdHeader.isBlank()) {
-      return;
+      return false;
     }
-    String traceId = request.getHeader("X-Trace-Id");
+    String traceId = request.getHeader(HEADER_TRACE_ID);
     if (traceId == null || traceId.isBlank()) {
-      return;
+      return false;
     }
     long userId;
     try {
       userId = Long.parseLong(userIdHeader.trim());
     } catch (NumberFormatException ex) {
-      return;
+      return false;
     }
     Long apiKeyId = null;
-    String ak = request.getHeader("X-Api-Key-Id");
+    String ak = request.getHeader(HEADER_API_KEY_ID);
     if (ak != null && !ak.isBlank()) {
       try {
         apiKeyId = Long.parseLong(ak.trim());
       } catch (NumberFormatException ignored) {
-        return;
+        return false;
       }
     }
 
@@ -76,7 +89,7 @@ public class BillingSettlementClient {
       outputTokens = u.path("completion_tokens").asLong(0);
     }
     if (inputTokens == 0 && outputTokens == 0) {
-      return;
+      return false;
     }
 
     String modelName = chatRequest.path("model").asText(null);
@@ -84,28 +97,38 @@ public class BillingSettlementClient {
       modelName = "deepseek-v4-flash";
     }
 
+    String idempotencyKey = request.getHeader(HEADER_IDEMPOTENCY_COMPOSITE);
+    String idempotencySource = request.getHeader(HEADER_IDEMPOTENCY_SOURCE);
+
     String base = trimTrailingSlash(billingBaseUrl);
     String url = base + "/internal/billing/settle";
     Map<String, Object> body = new LinkedHashMap<>();
-    body.put("traceId", traceId);
+    body.put("traceId", traceId.trim());
     body.put("userId", userId);
     body.put("apiKeyId", apiKeyId);
     body.put("providerCode", resolveProviderForModel(modelName));
     body.put("modelName", modelName);
     body.put("inputTokens", inputTokens);
     body.put("outputTokens", outputTokens);
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      body.put("idempotencyKey", idempotencyKey.trim());
+    }
+    if (idempotencySource != null && !idempotencySource.isBlank()) {
+      body.put("idempotencySource", idempotencySource.trim());
+    }
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.set("X-Internal-Token", internalToken);
     try {
-      restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Void.class);
+      var response = restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Void.class);
+      return response.getStatusCode().is2xxSuccessful();
     } catch (Exception ex) {
       log.warn("billing settle failed: {}", ex.toString());
+      return false;
     }
   }
 
-  /** 故障转移到智谱时请求体中的 model 多为 glm-*，按名称推断 provider 以便计价命中 model_prices。 */
   private String resolveProviderForModel(String modelName) {
     if (modelName == null || modelName.isBlank()) {
       return providerCode;

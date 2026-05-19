@@ -10,5 +10,7 @@ public record SettlementRequest(
     @NotBlank String providerCode,
     @NotBlank String modelName,
     long inputTokens,
-    long outputTokens
+    long outputTokens,
+    String idempotencyKey,
+    String idempotencySource
 ) {}

@@ -11,11 +11,12 @@
 | 3 | [02-V1IngressAuthGatewayFilter.md](./filters/02-V1IngressAuthGatewayFilter.md) | `/v1/**` 入口鉴权（Bearer / JWT） |
 | 4 | [03-BillingApiKeyResolveGatewayFilter.md](./filters/03-BillingApiKeyResolveGatewayFilter.md) | API Key 指纹解析与用户头注入 |
 | 5 | [04-ApiKeyResolutionCache.md](./filters/04-ApiKeyResolutionCache.md) | Key 解析 Redis 缓存（O-5） |
-| 6 | [05-IpRiskAndQuotaGatewayFilter.md](./filters/05-IpRiskAndQuotaGatewayFilter.md) | IP 黑白名单与日配额（O-6） |
-| 7 | [06-ApiKeyRedisRateLimitGatewayFilter.md](./filters/06-ApiKeyRedisRateLimitGatewayFilter.md) | 秒级 QPS 限流 |
-| 8 | [07-BillingPreflightGatewayFilter.md](./filters/07-BillingPreflightGatewayFilter.md) | Chat 余额预检 |
-| 9 | [08-路由与配置.md](./08-路由与配置.md) | `application.yml`、环境变量、超时 |
-| 10 | [09-错误响应与头约定.md](./09-错误响应与头约定.md) | 业务 JSON、注入头、错误码 |
+| 6 | [08-IdempotencyGatewayFilter.md](./filters/08-IdempotencyGatewayFilter.md) | Chat 扣费幂等（O-10） |
+| 7 | [05-IpRiskAndQuotaGatewayFilter.md](./filters/05-IpRiskAndQuotaGatewayFilter.md) | IP 黑白名单与日配额（O-6） |
+| 8 | [06-ApiKeyRedisRateLimitGatewayFilter.md](./filters/06-ApiKeyRedisRateLimitGatewayFilter.md) | 秒级 QPS 限流 |
+| 9 | [07-BillingPreflightGatewayFilter.md](./filters/07-BillingPreflightGatewayFilter.md) | Chat 余额预检 |
+| 10 | [08-路由与配置.md](./08-路由与配置.md) | `application.yml`、环境变量、超时 |
+| 11 | [09-错误响应与头约定.md](./09-错误响应与头约定.md) | 业务 JSON、注入头、错误码 |
 
 ## 源码入口
 

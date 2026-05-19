@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |----|------|
 | 类 | `com.tokenhub.gateway.infrastructure.web.IpRiskAndQuotaGatewayFilter` |
-| Order | `HIGHEST_PRECEDENCE + 12` |
+| Order | `HIGHEST_PRECEDENCE + 13`（在 Idempotency +12 之后） |
 | Backlog | [O-6](../../../docs/TDD/O-06-网关风控-IP与配额.md) |
 
 ---

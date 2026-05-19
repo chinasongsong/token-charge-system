@@ -12,8 +12,9 @@
 | 4 | [components/03-WeightedRoutingPolicy.md](./components/03-WeightedRoutingPolicy.md) | 路由权重 |
 | 5 | [components/04-ProviderAdapters.md](./components/04-ProviderAdapters.md) | DeepSeek / 智谱适配器 |
 | 6 | [components/05-BillingSettlementClient.md](./components/05-BillingSettlementClient.md) | 用量记账 |
-| 7 | [components/06-RiskEventRecorder.md](./components/06-RiskEventRecorder.md) | 故障转移审计 |
-| 8 | [08-路由与配置.md](./08-路由与配置.md) | Resilience4j、环境变量 |
+| 7 | [components/07-ChatIdempotencyResponseCache.md](./components/07-ChatIdempotencyResponseCache.md) | Chat 响应幂等缓存（用户+平台） |
+| 8 | [components/06-RiskEventRecorder.md](./components/06-RiskEventRecorder.md) | 故障转移审计 |
+| 9 | [08-路由与配置.md](./08-路由与配置.md) | Resilience4j、环境变量 |
 
 ## 源码入口
 
